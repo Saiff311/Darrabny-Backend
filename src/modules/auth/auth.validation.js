@@ -14,28 +14,28 @@ export const signupSchema = joi.object({
     mobileNumber : joi.string().required().regex(/^01[0125][0-9]{8}$/),
     role : joi.string().valid(roles.student, roles.academic_supervisor, roles.company_supervisor, roles.collegeAdmin).required(),
     // student fields
-    collegeId: joi.string()
-        .when('role', { is: roles.student , then: generalRules.id.optional(), otherwise: joi.forbidden() }),
-    graduationYear: joi.number()
-        .when('role', { is: roles.student, then: joi.number().integer().min(1940).max(new Date().getFullYear()+10).optional(), otherwise: joi.forbidden() }),
-    major: joi.string()
-        .when('role', { is: roles.student, then: joi.string().optional(), otherwise: joi.forbidden() }),
-    minor: joi.string()
-        .when('role', { is: roles.student, then: joi.string().optional(), otherwise: joi.forbidden() }),
-    CGPA: joi.number()
-        .when('role', { is: roles.student, then: joi.number().min(0).max(4).optional(), otherwise: joi.forbidden() }),
+    // collegeId: joi.string()
+    //     .when('role', { is: roles.student , then: generalRules.id.optional(), otherwise: joi.forbidden() }),
+    // graduationYear: joi.number()
+    //     .when('role', { is: roles.student, then: joi.number().integer().min(1940).max(new Date().getFullYear()+10).optional(), otherwise: joi.forbidden() }),
+    // major: joi.string()
+    //     .when('role', { is: roles.student, then: joi.string().optional(), otherwise: joi.forbidden() }),
+    // minor: joi.string()
+    //     .when('role', { is: roles.student, then: joi.string().optional(), otherwise: joi.forbidden() }),
+    // CGPA: joi.number()
+    //     .when('role', { is: roles.student, then: joi.number().min(0).max(4).optional(), otherwise: joi.forbidden() }),
     // academic supervisor fields
-    collegeId: joi.string()
-        .when('role', { is: roles.academic_supervisor , then: generalRules.id.required(), otherwise: joi.forbidden() }),
-    department: joi.string()
-        .when('role', { is: roles.academic_supervisor, then: joi.string().required(), otherwise: joi.forbidden() }),
-    title: joi.string()
-        .when('role', { is: roles.academic_supervisor, then: joi.string().optional(), otherwise: joi.forbidden() }),
+    // collegeId: joi.string()
+    //     .when('role', { is: roles.academic_supervisor , then: generalRules.id.required(), otherwise: joi.forbidden() }),
+    // department: joi.string()
+    //     .when('role', { is: roles.academic_supervisor, then: joi.string().required(), otherwise: joi.forbidden() }),
+    // title: joi.string()
+    //     .when('role', { is: roles.academic_supervisor, then: joi.string().optional(), otherwise: joi.forbidden() }),
     // company supervisor fields
-    companyId: joi.string()
-        .when('role', { is: roles.company_supervisor, then: generalRules.id.required(), otherwise: joi.forbidden() }),
-    position: joi.string()
-        .when('role', { is: roles.company_supervisor, then: joi.string().required(), otherwise: joi.forbidden() })
+    // companyId: joi.string()
+    //     .when('role', { is: roles.company_supervisor, then: generalRules.id.required(), otherwise: joi.forbidden() }),
+    // position: joi.string()
+    //     .when('role', { is: roles.company_supervisor, then: joi.string().required(), otherwise: joi.forbidden() })
 }).required()
 
 export const confirmEmailSchema = joi.object({

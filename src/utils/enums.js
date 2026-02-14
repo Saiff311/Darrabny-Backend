@@ -20,7 +20,7 @@ Object.freeze(providers)
 
 
 export const roles = {
-    student: "Student",
+    student: "trainee",
     academic_supervisor: "Academic_Supervisor",
     collegeAdmin: "College_Admin",
     company_supervisor: "Company_Supervisor",
