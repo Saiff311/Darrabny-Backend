@@ -5,9 +5,9 @@ import { compare } from "../../utils/security/hashing.js";
 import { decrypt } from "../../utils/security/encryption.js";
 
 //--------------------------------Etoo--------------------------------------------------------
-export const UpdateAccount = asyncHandler( async (req, res, next)=>{
+export const UpdateStudentAccount = asyncHandler( async (req, res, next)=>{
     //update account via this way so the encryption hook works (doesn't work with updateOne())
-    const { fullName, email, mobileNumber, address } = req.body;
+    const { fullName, about, links } = req.body;
 
     const user = await userModel.findById(req.user._id);
     
@@ -17,18 +17,14 @@ export const UpdateAccount = asyncHandler( async (req, res, next)=>{
         user.lastName = nameParts.join(" ");
     }
 
-    if (email) {
-        user.email = email;
+    if (about) {
+        user.about = about;
     }
-
-    if (mobileNumber) {
-        user.mobileNumber = mobileNumber;
-    }
-
-    if (address && typeof address === "object") {
-        user.address = {
-        country: address.country ?? user.address?.country,
-        city: address.city ?? user.address?.city,
+    
+    if (links && typeof links === "object") {
+        user.links = {
+        linkedin: links.linkedin ?? user.links?.linkedin,
+        github: links.github ?? user.links?.github,
         };
     }
 
@@ -39,30 +35,14 @@ export const UpdateAccount = asyncHandler( async (req, res, next)=>{
         user
     });
 })
-// --------------------------------------Etoo--------------------------------------------------------
-export const getLoginUser = asyncHandler( async (req, res, next)=>{
+
+//--------------------------------Etoo--------------------------------------------------------
+export const getLoginStudent = asyncHandler( async (req, res, next)=>{
     const user = await userModel.findById(req.user._id)
-    //decrypt mobile number
+    .select("-notifications -DOB -provider -isConfirmed -isDeleted -password -otp")
+    // decrypt mobile number
     user.mobileNumber = await decrypt(user.mobileNumber)
-    return res.status(200).json({msg: "My Profile",
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phoneNumber: user.mobileNumber,
-        address: user.address,
-        notifications:{
-            "email": true,
-            "push": true
-        }
-    }) 
-})
-// --------------------------------------Etoo--------------------------------------------------------
-export const myNotifications = asyncHandler( async (req, res, next)=>{
-    const {email, push} = req.body
-    const user = await userModel.findById(req.user._id)
-    user.notifications = {email, push}
-    await user.save()
-    return res.status(200).json({msg: "Notifications updated successfully", notifications: user.notifications}) 
+    return res.status(200).json({msg: "My Profile",user}) 
 })
 
 export const getAnotherUser = asyncHandler( async (req, res, next)=>{

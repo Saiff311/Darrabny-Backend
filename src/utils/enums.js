@@ -1,54 +1,54 @@
 export const genders = {
-    male: "Male",
-    female: "Female"
+    male: "male",
+    female: "female"
 }
 Object.freeze(genders)
 
 
 export const otpType = {
-    confirmEmail: "ConfirmEmail",
-    forgetPassword: "ForgetPassword"
+    confirmEmail: "confirmEmail",
+    forgetPassword: "forgetPassword"
 }
 Object.freeze(otpType)
 
 
 export const providers = {
-    google: "Google",
-    system: "System"
+    google: "google",
+    system: "system"
 }
 Object.freeze(providers)
 
 
 export const roles = {
-    student: "trainee",
-    academic_supervisor: "Academic_Supervisor",
-    collegeAdmin: "College_Admin",
-    company_supervisor: "Company_Supervisor",
-    admin: "Admin"
+    student: "student",
+    academic_supervisor: "academic_supervisor",
+    collegeAdmin: "college_admin",
+    company_supervisor: "company_supervisor",
+    admin: "admin"
 }
 Object.freeze(roles)
 
 
 export const internshipLocations = {
-    onsite: "Onsite",
-    remote: "Remote",
-    hybrid: "Hybrid"
+    onsite: "onsite",
+    remote: "remote",
+    hybrid: "hybrid"
 }
 Object.freeze(internshipLocations)
 
 
 export const workingTimes = {
-    partTime: "Part-time",
-    fullTime: "Full-time"
+    partTime: "part-time",
+    fullTime: "full-time"
 }
 Object.freeze(workingTimes)
 
 
 export const appStatus = {
-    pending :"Pending",
-    accepted: "Accepted",
-    viewed: "Viewed",
-    inconsideration: "Inconsideration",
-    rejected: "Rejected"
+    pending :"pending",
+    accepted: "accepted",
+    viewed: "viewed",
+    inconsideration: "inconsideration",
+    rejected: "rejected"
 }
 Object.freeze(appStatus)

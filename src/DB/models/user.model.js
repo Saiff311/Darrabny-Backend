@@ -6,6 +6,7 @@ import applicationModel from "./application.model.js";
 import chatModel from "./chat.model.js";
 import jobModel from "./internship.model.js";
 import cron from "node-cron";
+import { count } from "console";
 
 const userSchema = new mongoose.Schema(
   {
@@ -94,18 +95,32 @@ const userSchema = new mongoose.Schema(
       secure_url: String,
       public_id: String,
     },
-
+    address:{
+      country: String,
+      city: String,
+    },
+    notifications: {
+      email: Boolean,
+      push: Boolean
+    },
     skills: [String],
 
-    resume: {
-      secure_url: String,
-      public_id: String,
-    },
-    linkedinProfile: {
-      type: String,
-      match: /^(https?:\/\/)?(www\.)?linkedin\.com\/.*$/i,
-      trim: true,
-    },
+    // resume: {
+    //   secure_url: String,
+    //   public_id: String,
+    // },
+    links: {
+      linkedin: {
+        type: String,
+        match: /^(https?:\/\/)?(www\.)?linkedin\.com\/.*$/i,
+        trim: true,
+      },
+      github: {
+        type: String,
+        match: /^(https?:\/\/)?(www\.)?github\.com\/.*$/i,
+        trim: true,
+      },
+  },
     portfolio: {
       type: String,
       match:
@@ -117,9 +132,9 @@ const userSchema = new mongoose.Schema(
       maxLength: [500, "Bio cannot be more than 500 characters"],
       trim: true,
     },
-    description: {
+    about: {
       type: String,
-      maxLength: [2000, "Description cannot be more than 2000 characters"],
+      maxLength: [2000, "About cannot be more than 2000 characters"],
       trim: true,
     },
     savedInternships: [
@@ -132,12 +147,12 @@ const userSchema = new mongoose.Schema(
       {
         code: {
           type: String,
-          require: true,
+          required: true,
         },
         type: {
           type: String,
           enum: Object.values(otpType),
-          require: true,
+          required: true,
         },
         expiresIn: {
           type: Date,
@@ -154,8 +169,8 @@ const userSchema = new mongoose.Schema(
 );
 //socket id and user id
 export const connectionUser = new Map();
-// User name
-userSchema.virtual("userName").get(function () {
+// full name
+userSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 //Hashing & encryption hook
