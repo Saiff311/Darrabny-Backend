@@ -54,6 +54,7 @@ import connectDB from "./DB/connectionDB.js";
 import authRouter from "./modules/auth/auth.controller.js";
 import companyRouter from "./modules/company/company.controller.js";
 import userRouter from "./modules/user/user.controller.js";
+import studentRouter from "./modules/student/student.controller.js"; // Etoo
 import chatRouter from "./modules/chat/chat.controller.js";
 import adminRouter from "./modules/Admin/regularApis/admin.controller.js";
 import { globalErrorHandler } from "./utils/globalErrorHandling.js";
@@ -71,6 +72,7 @@ const bootstrap = (app, express) => {
 
   app.use("/auth", authRouter);
   app.use("/user", userRouter);
+  app.use("/student", studentRouter); // Etoo
   app.use("/company", companyRouter);
   app.use("/admin", adminRouter);
   app.use("/chat", chatRouter);

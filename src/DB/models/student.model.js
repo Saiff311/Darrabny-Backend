@@ -26,6 +26,10 @@ const studentSchema = new mongoose.Schema({
         min: [0.0, "CGPA cannot be less than 0.0"],
         max: [4.0, "CGPA cannot be more than 4.0"]
     },
+    userCV: {
+        secure_url: String,
+        public_id: String
+    }
   
 },{
     timestamps: true,

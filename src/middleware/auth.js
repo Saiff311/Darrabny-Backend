@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import userModel from '../DB/models/user.model.js'
 import { asyncHandler } from '../utils/globalErrorHandling.js'
+import { log } from 'console'
 
 export const auth = (accessRoles = [])=>{
     return asyncHandler(async(req,res,next)=>{
@@ -33,6 +34,8 @@ export const auth = (accessRoles = [])=>{
             }
             // Check id & user
             const authUser = await userModel.findById(payload.id).select('-otp').lean()
+            console.log(authUser);
+            
             if(!authUser){
                 return next(new Error("Not registered account!",{cause:400}))
             }

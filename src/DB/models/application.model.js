@@ -10,10 +10,6 @@ const applicationSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref : 'user'
     },
-    userCV: {
-        secure_url: String,
-        public_id: String
-    },
     status: {
         type: String,
         enum: Object.values(appStatus),
