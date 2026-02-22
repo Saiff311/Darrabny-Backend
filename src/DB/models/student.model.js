@@ -1,5 +1,30 @@
 import mongoose from "mongoose"
 
+const projectSchema = new mongoose.Schema({
+    type: {
+        type: String,
+        enum: ["personal", "course"],
+        required: true,
+    },
+    title: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    description: {
+        type: String,
+        required: true,
+    },
+    thumbnail: {
+        type: String,
+        required: true,
+    },
+    link: {
+        type: String,
+        required: true,
+    },
+}, { _id: true });
+
 const studentSchema = new mongoose.Schema({
     userId : {
         type: mongoose.Schema.Types.ObjectId,
@@ -26,10 +51,11 @@ const studentSchema = new mongoose.Schema({
         min: [0.0, "CGPA cannot be less than 0.0"],
         max: [4.0, "CGPA cannot be more than 4.0"]
     },
-    userCV: {
+    resume: {
         secure_url: String,
         public_id: String
-    }
+    },
+    projects : [projectSchema]
   
 },{
     timestamps: true,
