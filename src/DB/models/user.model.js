@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
-      required: true, // error possibility
+      required: true,
       trim: true,
       minLength: [3, "Name too short"],
       maxLength: [30, "Name too long"],

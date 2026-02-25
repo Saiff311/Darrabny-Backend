@@ -24,7 +24,8 @@ export const roles = {
     academic_supervisor: "academic_supervisor",
     collegeAdmin: "college_admin",
     company_supervisor: "company_supervisor",
-    admin: "admin"
+    admin: "admin",
+    company: "company"
 }
 Object.freeze(roles)
 
