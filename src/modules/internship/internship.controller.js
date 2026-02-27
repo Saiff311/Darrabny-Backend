@@ -1,66 +1,84 @@
-import {Router} from 'express';
-import { validation } from '../../middleware/validation.js';
-import { auth } from '../../middleware/auth.js';
-import { roles } from '../../utils/enums.js';
-import * as JV from './internship.validation.js';
-import * as JS from "./internship.service.js"
-import { fileTypes, hostMulter } from '../../middleware/multer.js';
+import { Router } from "express";
+import { validation } from "../../middleware/validation.js";
+import { auth } from "../../middleware/auth.js";
+import { roles } from "../../utils/enums.js";
+import * as JV from "./internship.validation.js";
+import * as JS from "./internship.service.js";
+import { fileTypes, hostMulter } from "../../middleware/multer.js";
 
 const internshipRouter = Router();
 
-internshipRouter.post("/add",
-    validation(JV.addInternshipSchema),
-    auth(Object.values(roles)),
-    JS.addInternship
-)
+// Add internship (company only)
+internshipRouter.post(
+  "/add",
+  validation(JV.addInternshipSchema),
+  auth(["company"]),
+  JS.addInternship,
+);
 
-internshipRouter.patch("/:internshipId",
-    validation(JV.updateInternshipSchema),
-    auth(Object.values(roles)),
-    JS.updateInternship
-)
+// Update internship
+internshipRouter.patch(
+  "/:internshipId",
+  validation(JV.updateInternshipSchema),
+  auth(Object.values(roles)),
+  JS.updateInternship,
+);
 
-internshipRouter.delete("/:internshipId",
-    validation(JV.InternshipIdSchema),
-    auth(Object.values(roles)),
-    JS.deleteInternship
-)
+// Delete internship
+internshipRouter.delete(
+  "/:internshipId",
+  validation(JV.InternshipIdSchema),
+  auth(Object.values(roles)),
+  JS.deleteInternship,
+);
 
-internshipRouter.get("/companyInternships/:companyId?",
-    validation(JV.getCompanyInternshipsSchema),
-    auth(Object.values(roles)),
-    JS.getCompanyInternships
-)
+// Get company internships
+internshipRouter.get(
+  "/companyInternships/:companyId?",
+  validation(JV.getCompanyInternshipsSchema),
+  auth(Object.values(roles)),
+  JS.getCompanyInternships,
+);
 
-internshipRouter.get("/:internshipId",
-    validation(JV.InternshipIdSchema),
-    auth(Object.values(roles)),
-    JS.getInternshipById
-)
+// Get internship by ID
+internshipRouter.get(
+  "/:internshipId",
+  validation(JV.InternshipIdSchema),
+  auth(Object.values(roles)),
+  JS.getInternshipById,
+);
 
-internshipRouter.get("/filteredInternships",
-    validation(JV.getFilteredInternshipsSchema),
-    auth(Object.values(roles)),
-    JS.getFilteredInternships
-)
+// Get filtered internships
+internshipRouter.get(
+  "/filteredInternships",
+  validation(JV.getFilteredInternshipsSchema),
+  auth(Object.values(roles)),
+  JS.getFilteredInternships,
+);
 
-internshipRouter.get("/internshipApp",
-    validation(JV.InternshipIdSchema),
-    auth(Object.values(roles)),
-    JS.getInternshipApp
-)
+// Get internship applications
+internshipRouter.get(
+  "/internshipApp",
+  validation(JV.InternshipIdSchema),
+  auth(Object.values(roles)),
+  JS.getInternshipApp,
+);
 
-internshipRouter.post("/ApplyToInternship/:internshipId",
-    validation(JV.InternshipIdSchema),
-    auth([roles.user]),
-    hostMulter(fileTypes.image).single("userCV"),
-    JS.ApplyToInternship
-)
+// Apply to internship (with CV upload)
+internshipRouter.post(
+  "/ApplyToInternship/:internshipId",
+  validation(JV.ApplyToInternshipSchema),
+  auth(Object.values(roles)),
+  hostMulter(fileTypes.image).single("userCV"),
+  JS.ApplyToInternship,
+);
 
-internshipRouter.patch("/responseApp/:appId",
-    validation(JV.responseAppSchema),
-    auth(Object.values(roles)),
-    JS.responseApp
-)
+// Response to application
+internshipRouter.patch(
+  "/responseApp/:appId",
+  validation(JV.responseAppSchema),
+  auth(Object.values(roles)),
+  JS.responseApp,
+);
 
 export default internshipRouter;

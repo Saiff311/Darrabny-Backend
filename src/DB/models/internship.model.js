@@ -5,8 +5,7 @@ import { getTimeAgo } from "../../utils/local-functions/timeAgo.js";
 
 const internshipSchema = mongoose.Schema(
   {
-    internshipTitle: {
-      // صححنا typo Tittle → Title
+    internshipTittle: {
       type: String,
       required: true,
       trim: true,
@@ -40,6 +39,11 @@ const internshipSchema = mongoose.Schema(
         trim: true,
       },
     ],
+    seniorityLevel: {
+      type: String,
+      enum: ["Junior", "Mid-Level", "Senior"],
+      required: true,
+    },
     addedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "user", // ممكن تغير لـ company لو تحب

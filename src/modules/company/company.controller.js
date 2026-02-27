@@ -5,7 +5,6 @@ import { validation } from "../../middleware/validation.js";
 import { auth } from "../../middleware/auth.js";
 import { hostMulter, fileTypes } from "../../middleware/multer.js";
 import { roles } from "../../utils/enums.js";
-import internshipRouter from "../internship/internship.controller.js";
 
 const companyRouter = Router();
 
@@ -98,4 +97,11 @@ companyRouter.post(
   CS.companyLogin,
 );
 
+// ------------------ Get Company Applications ------------------
+companyRouter.get(
+  "/applications",
+  auth([roles.company]),
+  validation(CV.getCompanyApplicationsSchema, "query"),
+  CS.getCompanyApplications
+);
 export default companyRouter;

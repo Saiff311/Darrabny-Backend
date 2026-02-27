@@ -1,4 +1,3 @@
-import { genders } from "../../utils/enums.js";
 import { generalRules } from "../../utils/generalRules.js";
 import joi from "joi";
 
@@ -116,4 +115,17 @@ export const companySignupSchema = joi.object({
 export const companyLoginSchema = joi.object({
   companyEmail: generalRules.email.required(),
   password: joi.string().required(),
+});
+
+export const getCompanyApplicationsSchema = joi.object({
+  status: joi
+    .string()
+    .valid("pending", "accepted", "rejected", "all")
+    .default("pending"),
+
+  page: joi.number().min(1).default(1),
+
+  limit: joi.number().min(1).max(100).default(10),
+
+  sort: joi.string().valid("newest").default("newest"),
 });
