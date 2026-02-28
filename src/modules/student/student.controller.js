@@ -18,6 +18,58 @@ StudentRouter.get("/getLoginStudent",
     auth([roles.student]),
     US.getLoginStudent)
 
+StudentRouter.post("/skills",
+    validation(UV.addSkillSchema),
+    auth([roles.student]),
+    US.addSkill)
+
+StudentRouter.get("/skills",
+    auth([roles.student]),
+    US.getSkills)
+
+StudentRouter.delete("/skills",
+    validation(UV.deleteSkillSchema),
+    auth([roles.student]),
+    US.deleteSkill)
+ 
+StudentRouter.post("/projects",
+    validation(UV.addProjectSchema),
+    auth([roles.student]),
+    US.addProject)  
+      
+StudentRouter.get("/projects",
+    auth([roles.student]),
+    US.getProjects)
+
+StudentRouter.patch("/projects/:projectId",
+    validation(UV.updateProjectSchema),
+    auth([roles.student]),
+    US.updateProject) 
+
+StudentRouter.delete("/projects/:projectId",
+    validation(UV.deleteProjectSchema),
+    auth([roles.student]),
+    US.deleteProject)
+
+StudentRouter.put("/resume",
+    // validation(UV.UploadResumeSchema),   
+    hostMulter(fileTypes.pdf).single("attachment"),
+    auth([roles.student]),
+    US.uploadResume)
+
+StudentRouter.get("/resume",  
+    auth([roles.student]),
+    US.downloadResume)
+
+StudentRouter.put("/avatar",
+    hostMulter(fileTypes.image).single("attachment"),
+    auth(Object.values(roles)),
+    US.UploadProfilePic)
+
+StudentRouter.put("/avatar2",
+    hostMulter(fileTypes.image).single("attachment"),
+    auth(Object.values(roles)),
+    US.uploadPice)
 
 StudentRouter.get("/getAnotherUser/:id",
     validation(UV.getAnotherUserSchema),
@@ -28,11 +80,6 @@ StudentRouter.patch("/updatePassword",
     validation(UV.updatePasswordSchema),
     auth(Object.values(roles)),
     US.updatePassword)    
-
-StudentRouter.patch("/UploadProfilePic",
-    hostMulter(fileTypes.image).single("attachment"),
-    auth(Object.values(roles)),
-    US.UploadProfilePic)
 
 StudentRouter.patch("/UploadCoverPic",
     hostMulter(fileTypes.image).single("attachment"),

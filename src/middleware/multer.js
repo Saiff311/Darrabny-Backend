@@ -4,15 +4,14 @@ import fs from "fs"
 import path from 'path'
 
 export const fileTypes = {
-    image: ["image/png", "image/jpg", "image/gif"],
+    image: ["image/png", "image/jpeg", "image/gif"],
     video: ["video/mp4"],
     audio: ["audio/mpeg"],
     pdf: ["application/pdf"]
 }
 
 export const localMulter = (customFile = [], customPath = "generals" ) => {
-    console.log("akdsvkasjvhasdkj");
-    
+
     const fullPath = path.resolve("./src/uploads", customPath)
     if(! fs.existsSync(fullPath)){
         fs.mkdirSync(fullPath, {recursive: true})
@@ -25,8 +24,7 @@ export const localMulter = (customFile = [], customPath = "generals" ) => {
             cb(null,nanoid(5)+ file.originalname)
         }
     })
-    console.log(req.file);
-    
+
     function fileFilter(req, file, cb){
         if(customFile.includes(file.mimetype)){
             cb(null, true)
@@ -38,7 +36,7 @@ export const localMulter = (customFile = [], customPath = "generals" ) => {
     const upload = multer({fileFilter, storage})
     return upload
 }
-export const hostMulter = (customFile = []) => {
+export const hostMulter = (customFile = [], maxSize = 10) => {
     
     const storage = multer.diskStorage({})
     
@@ -49,6 +47,11 @@ export const hostMulter = (customFile = []) => {
             cb(new Error("Invalid file format", false))
         }
     }
-    const upload = multer({fileFilter, storage})
+        const upload = multer({
+        fileFilter,
+        storage,
+        limits: { fileSize: maxSize * 1024 * 1024 }, // convert MB to bytes
+    })
     return upload
 }
+
