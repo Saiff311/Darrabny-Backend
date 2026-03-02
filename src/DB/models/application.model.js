@@ -2,24 +2,91 @@ import mongoose from "mongoose"
 import { appStatus } from "../../utils/enums.js"
 
 const applicationSchema = mongoose.Schema({
+
     jobId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref : 'jobOpportunity'
+        ref: 'jobOpportunity'
     },
+
+    internshipId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'internship'
+    },
+
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref : 'user'
+        ref: 'user',
+        required: true
     },
+
     userCV: {
         secure_url: String,
         public_id: String
     },
-    status: {
-        type: String,
-        enum: Object.values(appStatus),
-        default: appStatus.pending
+
+    // Status Timeline
+    timeline: [{
+        status: {
+            type: String,
+            enum: Object.values(appStatus),
+            required: true
+        },
+        date: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+
+    appliedAt: {
+        type: Date,
+        default: Date.now
     }
-}) 
+
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+})
+
+
+
+/* ======================================
+   Virtual: currentStatus
+====================================== */
+applicationSchema.virtual("currentStatus").get(function () {
+    if (!this.timeline || this.timeline.length === 0) return null
+    return this.timeline[this.timeline.length - 1].status
+})
+
+
+
+/* ======================================
+    Ensure first timeline status exists
+   (Auto push pending on create)
+====================================== */
+applicationSchema.pre("save", function (next) {
+
+    if (this.isNew && (!this.timeline || this.timeline.length === 0)) {
+        this.timeline = [{
+            status: appStatus.pending,
+            date: new Date()
+        }]
+    }
+
+    next()
+})
+
+
+
+/* ======================================
+    Index for performance
+   (important for status filtering)
+====================================== */
+applicationSchema.index({ userId: 1 })
+applicationSchema.index({ "timeline.status": 1 })
+applicationSchema.index({ internshipId: 1 })
+
+
 
 const applicationModel = mongoose.model("application", applicationSchema)
 

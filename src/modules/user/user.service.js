@@ -3,6 +3,10 @@ import cloudinary from "../../utils/cloudinary.js";
 import userModel from "../../DB/models/user.model.js";
 import { compare } from "../../utils/security/hashing.js";
 import { decrypt } from "../../utils/security/encryption.js";
+import internshipModel from "../../DB/models/internship.model.js";
+import applicationModel from "../../DB/models/application.model.js";
+import { appStatus } from "../../utils/enums.js";
+import mongoose from "mongoose";
 
 export const UpdateAccount = asyncHandler( async (req, res, next)=>{
     //update account via this way so the encryption hook works (doesn't work with updateOne())
@@ -119,3 +123,226 @@ export const softDelete = asyncHandler(async (req, res, next) => {
 });
 
 // export const saveInternship = asyncHandler(async(req,res,next)=>{})
+
+ export const GetStudentDashboard = asyncHandler(
+  async (req, res, next) => {
+
+    const studentId = req.user._id;
+    const activeLimit = parseInt(req.query.activeLimit) || 5;
+    const savedLimit = parseInt(req.query.savedLimit) || 5;
+
+    /* ================================
+    Get Active Internships
+    ================================= */
+    const activeInternshipsRaw = await internshipModel
+      .find({
+        closed: false,
+        acceptedStudents: studentId
+      })
+      .limit(activeLimit)
+      .populate("companyId", "name")
+      .lean();
+
+    const activeInternships = activeInternshipsRaw.map((i) => ({
+      id: i._id,
+      title: i.internshipTittle,
+      company: {
+        id: i.companyId?._id,
+        name: i.companyId?.name
+      },
+      location: i.internshipLocation,
+      workMode: i.workingTime,
+      isPaid: i.isPaid || false,
+      salary: i.salary || 0,
+      salaryType: i.salaryType || "month",
+      thumbnail: i.thumbnail || "",
+      progress: 0 
+    }));
+
+
+    /* ================================
+    Get Saved Internships
+    ================================= */
+    const user = await userModel
+      .findById(studentId)
+      .populate({
+        path: "savedInternships",
+        options: { limit: savedLimit },
+        populate: { path: "companyId", select: "name" }
+      })
+      .lean();
+
+    const savedInternships = (user?.savedInternships || []).map((s) => ({
+      id: s._id,
+      title: s.internshipTittle,
+      company: {
+        id: s.companyId?._id,
+        name: s.companyId?.name
+      }
+    }));
+
+
+
+    // completed internships
+    const internshipsCompleted = await internshipModel.countDocuments({
+      closed: true,
+      acceptedStudents: studentId
+    });
+
+    // average company rating
+    const completedInternships = await internshipModel
+      .find({
+        closed: true,
+        acceptedStudents: studentId
+      })
+      .select("evaluations")
+      .lean();
+
+    let totalRating = 0;
+    let ratingCount = 0;
+
+    completedInternships.forEach((internship) => {
+      if (internship.evaluations?.length) {
+        internship.evaluations.forEach((evaluation) => {
+          if (evaluation.companyRating) {
+            totalRating += evaluation.companyRating;
+            ratingCount++;
+          }
+        });
+      }
+    });
+
+    const averageCompanyRating =
+      ratingCount > 0 ? Number((totalRating / ratingCount).toFixed(1)) : 0;
+
+
+    /* ================================
+    Final Response
+    ================================= */
+
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        avatar: user.profilePic?.secure_url || ""
+      },
+      activeInternships: activeInternships || [],
+      stats: {
+        internshipsCompleted,
+        averageCompanyRating
+      },
+      savedInternships: savedInternships || []
+    });
+  }
+);
+
+export const GetStudentApplications = asyncHandler(async (req, res, next) => {
+  const studentId = req.user._id;
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const statusQuery = req.query.status || "all";
+
+  // Map frontend status query to actual currentStatus
+  const statusMap = {
+    active: appStatus.accepted,
+    "under-review": appStatus.inconsideration,
+    closed: appStatus.rejected,
+    all: null
+  };
+
+  if (!statusMap.hasOwnProperty(statusQuery)) {
+    return next(new Error("Invalid status value", { cause: 400 }));
+  }
+
+  const filterStatus = statusMap[statusQuery];
+
+  // Aggregation pipeline
+  const pipeline = [
+    { $match: { userId: new mongoose.Types.ObjectId(studentId) } },
+    // Compute currentStatus as last timeline entry
+    {
+      $addFields: {
+        currentStatus: { $arrayElemAt: ["$timeline.status", -1] },
+        timeline: {
+          $map: {
+            input: { $sortArray: { input: "$timeline", sortBy: { date: 1 } } },
+            as: "t",
+            in: { status: "$$t.status", date: "$$t.date" }
+          }
+        }
+      }
+    },
+  ];
+
+  // Apply status filter if not 'all'
+  if (filterStatus) {
+    pipeline.push({
+      $match: { currentStatus: filterStatus }
+    });
+  }
+
+  // Join internship
+  pipeline.push({
+    $lookup: {
+      from: "internships",
+      localField: "internshipId",
+      foreignField: "_id",
+      as: "internship"
+    }
+  });
+  pipeline.push({ $unwind: { path: "$internship", preserveNullAndEmptyArrays: true } });
+
+  // Join company inside internship
+  pipeline.push({
+    $lookup: {
+      from: "companies",
+      localField: "internship.companyId",
+      foreignField: "_id",
+      as: "company"
+    }
+  });
+  pipeline.push({ $unwind: { path: "$company", preserveNullAndEmptyArrays: true } });
+
+  // Facet for pagination + total count
+  pipeline.push({
+    $facet: {
+      data: [
+        { $sort: { appliedAt: -1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: limit },
+        {
+          $project: {
+            id: "$_id",
+            internship: {
+              id: "$internship._id",
+              title: "$internship.internshipTittle",
+              company: {
+                id: "$company._id",
+                name: "$company.name"
+              }
+            },
+            appliedAt: 1,
+            currentStatus: 1,
+            timeline: 1
+          }
+        }
+      ],
+      totalCount: [{ $count: "total" }]
+    }
+  });
+
+  const result = await applicationModel.aggregate(pipeline);
+
+  const applications = result[0].data;
+  const total = result[0].totalCount[0]?.total || 0;
+
+  return res.status(200).json({
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+    applications
+  });
+});

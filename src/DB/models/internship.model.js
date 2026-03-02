@@ -9,74 +9,116 @@ const internshipSchema = mongoose.Schema({
         required: true,
         trim: true,
     },
+
     internshipLocation: {
         type: String,
         required: true,
         enum: Object.values(internshipLocations)
     },
+
     workingTime: {
         type: String,
-        require: true,
+        required: true,
         enum: Object.values(workingTimes)
     },
+
     internshipDescription: {
         type: String,
         required: true,
         trim: true
     },
+
     technicalSkills:[{
         type: String,
         required: true,
         trim: true
     }],
+
     softSkills :[{
         type: String,
         required: true,
         trim: true
     }],
+
+    // NEW FIELDS
+    startDate: {
+        type: Date,
+        required: true
+    },
+
+    endDate: {
+        type: Date,
+        required: true,
+        validate: {
+            validator: function(value) {
+                return value > this.startDate;
+            },
+            message: "End date must be after start date"
+        }
+    },
+
+    thumbnail: {
+        type: String
+    },
+
     addedBy:{
         type: mongoose.Schema.Types.ObjectId,
-        // ref: "company",
         ref: 'user'
     },
+
     updatedBy:{
         type: mongoose.Schema.Types.ObjectId,
-        // ref: "company",
         ref: 'user'
     },
+
     closed: {
         type: Boolean,
         default: false
     },
+
     companyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "company"
     },
+
     deletedAt: Date
+
 },{
     timestamps: true,
     toJSON: {virtuals: true},
     toObject: {virtuals: true}
 })
+
+
+// Index for performance (status filtering)
+internshipSchema.index({ endDate: 1 })
+internshipSchema.index({ companyId: 1 })
+
+
+// Virtual Applications
 internshipSchema.virtual('Applications',{
     ref: 'application',
     localField: '_id',
     foreignField: 'internshipId',
 })
-internshipSchema.pre('remove',async function(next) {
+
+
+// Cascade delete applications
+internshipSchema.pre('deleteOne', { document: true }, async function(next) {
     try{
         await applicationModel.deleteMany({internshipId: this._id})
         next()
     }catch(err){
         next(err)
     }
-    
 })
 
-// Virtual for posted time ago
+
+// Posted ago
 internshipSchema.virtual("postedAgo").get(function () {
   return getTimeAgo(this.createdAt);
 });
+
 
 const internshipModel = mongoose.model("internship",internshipSchema)
 

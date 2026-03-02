@@ -14,6 +14,15 @@ internshipRouter.post("/add",
     JS.addInternship
 )
 
+
+internshipRouter.get("/my",
+    auth([roles.student]),
+    (req, res) => {
+        console.log("MY ROUTE WORKED");
+        res.json({ message: "OK" });
+    }
+)
+
 internshipRouter.patch("/:internshipId",
     validation(JV.updateInternshipSchema),
     auth(Object.values(roles)),
@@ -31,6 +40,7 @@ internshipRouter.get("/companyInternships/:companyId?",
     auth(Object.values(roles)),
     JS.getCompanyInternships
 )
+
 
 internshipRouter.get("/:internshipId",
     validation(JV.InternshipIdSchema),

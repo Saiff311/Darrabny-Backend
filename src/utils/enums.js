@@ -20,7 +20,7 @@ Object.freeze(providers)
 
 
 export const roles = {
-    student: "trainee",
+    student: "Student",
     academic_supervisor: "Academic_Supervisor",
     collegeAdmin: "College_Admin",
     company_supervisor: "Company_Supervisor",
@@ -52,3 +52,9 @@ export const appStatus = {
     rejected: "Rejected"
 }
 Object.freeze(appStatus)
+
+export const internshipStatus = {
+    inProgress: "in-progress",
+    completed: "completed"
+}
+Object.freeze(internshipStatus)

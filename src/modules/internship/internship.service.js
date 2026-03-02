@@ -5,6 +5,7 @@ import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import { emailEvent } from "../../services/sendEmail/email.event.js";
 import { escapeRegex } from "../../utils/security/escapeRegax.js";
 import userModel from "../../DB/models/user.model.js";
+import { internshipStatus } from "../../utils/enums.js";
 
 export const addInternship = asyncHandler(async (req, res, next) => {
   const { companyId } = req.params;
@@ -336,5 +337,84 @@ export const responseApp = asyncHandler(async (req, res, next) => {
     success: true,
     message: "Application responded successfully",
     data: application,
+  });
+});
+
+export const getStudentInternships = asyncHandler(async (req, res, next) => {
+  const studentId = req.user._id;
+  const { status, page = 1, limit = 10 } = req.query;
+  const skip = (page - 1) * limit;
+
+  // filter by internship status (inProgress, completed)
+  const today = new Date();
+  let statusFilter = {};
+  if (status === internshipStatus.inProgress) {
+    statusFilter.endDate = { $gte: today };
+  } else if (status === internshipStatus.completed) {
+    statusFilter.endDate = { $lt: today };
+  }
+
+  // Get internshipIds from applications of the student
+  const applications = await applicationModel
+    .find({ userId: studentId })
+    .select("internshipId")
+    .lean();
+
+  const internshipIds = applications.map((app) => app.internshipId);
+
+  const totalCount = await internshipModel.countDocuments({
+    _id: { $in: internshipIds },
+    ...statusFilter,
+  });
+
+  const internships = await internshipModel
+    .find({ _id: { $in: internshipIds }, ...statusFilter })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(Number(limit))
+    .populate("companyId", "companyName")
+    .lean();
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+
+  //internship progress calculation
+  const data = internships.map((internship) => {
+    const start = new Date(internship.startDate);
+    const end = new Date(internship.endDate);
+
+    const totalWeeks = Math.ceil((end - start) / msPerDay / 7);
+    const currentWeek = Math.min(
+      Math.ceil((today - start) / msPerDay / 7),
+      totalWeeks
+    );
+    const progress = Math.round((currentWeek / totalWeeks) * 100);
+
+    return {
+      id: internship._id,
+      title: internship.internshipTittle,
+      company: {
+        id: internship.companyId._id,
+        name: internship.companyId.companyName,
+      },
+      location: internship.internshipLocation,
+      thumbnail: internship.thumbnail || "",
+      startDate: internship.startDate,
+      currentWeek,
+      totalWeeks,
+      progress,
+      status:
+        internship.endDate >= today
+          ? internshipProgressStatus.inProgress
+          : internshipProgressStatus.completed,
+    };
+  });
+
+  return res.status(200).json({
+    data,
+    meta: {
+      page: Number(page),
+      limit: Number(limit),
+      total: totalCount,
+    },
   });
 });
