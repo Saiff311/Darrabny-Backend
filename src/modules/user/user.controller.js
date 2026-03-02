@@ -55,4 +55,12 @@ userRouter.delete("/softDelete",
     auth(Object.values(roles)),
     US.softDelete)
 
-export default userRouter
+userRouter.get("/dashboard",
+    auth([roles.student]),
+    US.GetStudentDashboard)
+
+userRouter.get("/myapplications",
+    auth([roles.student]),
+    US.GetStudentApplications
+)
+    export default userRouter

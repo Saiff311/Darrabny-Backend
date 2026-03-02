@@ -54,3 +54,9 @@ export const seniorityLevels = {
   senior: "Senior",
 };
 Object.freeze(seniorityLevels);
+    
+export const internshipStatus = {
+    inProgress: "in-progress",
+    completed: "completed"
+}
+Object.freeze(internshipStatus)

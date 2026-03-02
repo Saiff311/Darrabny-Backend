@@ -24,6 +24,20 @@ internshipRouter.patch(
   JS.updateInternship,
 );
 
+internshipRouter.get("/my",
+    auth([roles.student]),
+    (req, res) => {
+        console.log("MY ROUTE WORKED");
+        res.json({ message: "OK" });
+    }
+)
+
+internshipRouter.patch("/:internshipId",
+    validation(JV.updateInternshipSchema),
+    auth(Object.values(roles)),
+    JS.updateInternship
+)
+
 // Delete internship
 internshipRouter.delete(
   "/:internshipId",
@@ -47,6 +61,7 @@ internshipRouter.get(
   auth(Object.values(roles)),
   JS.getInternshipById,
 );
+
 
 // Get filtered internships
 internshipRouter.get(

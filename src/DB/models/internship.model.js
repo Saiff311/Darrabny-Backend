@@ -3,28 +3,32 @@ import { internshipLocations, workingTimes } from "../../utils/enums.js";
 import applicationModel from "./application.model.js";
 import { getTimeAgo } from "../../utils/local-functions/timeAgo.js";
 
-const internshipSchema = mongoose.Schema(
+const internshipSchema = new mongoose.Schema(
   {
     internshipTittle: {
       type: String,
       required: true,
       trim: true,
     },
+
     internshipLocation: {
       type: String,
       required: true,
       enum: Object.values(internshipLocations),
     },
+
     workingTime: {
       type: String,
-      required: true, // صححنا typo
+      required: true,
       enum: Object.values(workingTimes),
     },
+
     internshipDescription: {
       type: String,
       required: true,
       trim: true,
     },
+
     technicalSkills: [
       {
         type: String,
@@ -32,6 +36,7 @@ const internshipSchema = mongoose.Schema(
         trim: true,
       },
     ],
+
     softSkills: [
       {
         type: String,
@@ -39,55 +44,89 @@ const internshipSchema = mongoose.Schema(
         trim: true,
       },
     ],
+
     seniorityLevel: {
       type: String,
       enum: ["Junior", "Mid-Level", "Senior"],
       required: true,
     },
+
+    startDate: {
+      type: Date,
+      required: true,
+    },
+
+    endDate: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function (value) {
+          return value > this.startDate;
+        },
+        message: "End date must be after start date",
+      },
+    },
+
+    thumbnail: {
+      type: String,
+    },
+
     addedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "user", // ممكن تغير لـ company لو تحب
+      ref: "user",
     },
+
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "user",
     },
+
     closed: {
       type: Boolean,
       default: false,
     },
+
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "company",
-      required: true, // مهم للفلو بتاعك
+      required: true,
     },
+
     deletedAt: Date,
   },
   {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  },
+  }
 );
 
-// Virtual for applications
+// Indexes
+internshipSchema.index({ endDate: 1 });
+internshipSchema.index({ companyId: 1 });
+
+// Virtual Applications
 internshipSchema.virtual("Applications", {
   ref: "application",
   localField: "_id",
   foreignField: "internshipId",
 });
 
-// pre remove hook
-internshipSchema.pre("remove", async function (next) {
-  try {
-    await applicationModel.deleteMany({ internshipId: this._id });
-    next();
-  } catch (err) {
-    next(err);
+// Cascade delete applications
+internshipSchema.pre(
+  "deleteOne",
+  { document: true },
+  async function (next) {
+    try {
+      await applicationModel.deleteMany({ internshipId: this._id });
+      next();
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
-// Virtual for posted time ago
+// Posted ago
 internshipSchema.virtual("postedAgo").get(function () {
   return getTimeAgo(this.createdAt);
 });
