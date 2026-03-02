@@ -26,10 +26,7 @@ internshipRouter.patch(
 
 internshipRouter.get("/my",
     auth([roles.student]),
-    (req, res) => {
-        console.log("MY ROUTE WORKED");
-        res.json({ message: "OK" });
-    }
+    JS.getStudentInternships
 )
 
 internshipRouter.patch("/:internshipId",
