@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { internshipLocations, workingTimes } from "../../utils/enums.js";
+import { internshipLocations, internshipStatus, workingTimes } from "../../utils/enums.js";
 import applicationModel from "./application.model.js";
 import { getTimeAgo } from "../../utils/local-functions/timeAgo.js";
 
