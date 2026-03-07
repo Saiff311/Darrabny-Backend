@@ -88,7 +88,7 @@ export const deleteCompanyCoverSchema = joi.object({
 // ------------------ Company Signup ------------------
 export const companySignupSchema = joi.object({
   companyName: joi.string().trim().min(2).max(60).required(),
-  companyEmail: generalRules.email.required(),
+  email: generalRules.email.required(),
   password: generalRules.password.required(),
 
   // confirm password
@@ -99,6 +99,11 @@ export const companySignupSchema = joi.object({
       "any.only": "Password and confirm password must match",
     }),
 
+  companyPhone: joi
+    .string()
+    .trim()
+    .pattern(/^[0-9+\-\s]{7,20}$/)
+    .required(),
   description: joi.string().trim().min(10),
   industry: joi.string().trim(),
   address: joi.string().trim(),
@@ -113,7 +118,7 @@ export const companySignupSchema = joi.object({
 
 // ------------------ Company Login ------------------
 export const companyLoginSchema = joi.object({
-  companyEmail: generalRules.email.required(),
+  email: generalRules.email.required(),
   password: joi.string().required(),
 });
 

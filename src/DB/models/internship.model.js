@@ -51,21 +51,26 @@ const internshipSchema = new mongoose.Schema(
       required: true,
     },
 
-    startDate: {
-      type: Date,
-      required: true,
+    status: {
+      type: String,
+      enum: Object.values(internshipStatus),
+      default: internshipStatus.onboarding,
     },
+    // startDate: {
+    //   type: Date,
+    //   required: true,
+    // },
 
-    endDate: {
-      type: Date,
-      required: true,
-      validate: {
-        validator: function (value) {
-          return value > this.startDate;
-        },
-        message: "End date must be after start date",
-      },
-    },
+    // endDate: {
+    //   type: Date,
+    //   required: true,
+    //   validate: {
+    //     validator: function (value) {
+    //       return value > this.startDate;
+    //     },
+    //     message: "End date must be after start date",
+    //   },
+    // },
 
     thumbnail: {
       type: String,
@@ -86,11 +91,11 @@ const internshipSchema = new mongoose.Schema(
       default: false,
     },
 
-    companyId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "company",
-      required: true,
-    },
+    // companyId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "company",
+    //   required: true,
+    // },
 
     deletedAt: Date,
   },
@@ -98,12 +103,12 @@ const internshipSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Indexes
 internshipSchema.index({ endDate: 1 });
-internshipSchema.index({ companyId: 1 });
+internshipSchema.index({ addedBy: 1 });
 
 // Virtual Applications
 internshipSchema.virtual("Applications", {
@@ -113,18 +118,14 @@ internshipSchema.virtual("Applications", {
 });
 
 // Cascade delete applications
-internshipSchema.pre(
-  "deleteOne",
-  { document: true },
-  async function (next) {
-    try {
-      await applicationModel.deleteMany({ internshipId: this._id });
-      next();
-    } catch (err) {
-      next(err);
-    }
+internshipSchema.pre("deleteOne", { document: true }, async function (next) {
+  try {
+    await applicationModel.deleteMany({ internshipId: this._id });
+    next();
+  } catch (err) {
+    next(err);
   }
-);
+});
 
 // Posted ago
 internshipSchema.virtual("postedAgo").get(function () {

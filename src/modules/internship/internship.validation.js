@@ -19,7 +19,6 @@ export const addInternshipSchema = Joi.object({
   internshipDescription: Joi.string().trim().min(10).required(),
   technicalSkills: Joi.array().items(Joi.string()).min(1).required(),
   softSkills: Joi.array().items(Joi.string()).min(1).required(),
-  companyId: generalRules.id.required(),
   seniorityLevel: Joi.string()
     .valid(...Object.values(seniorityLevels))
     .required(),

@@ -10,19 +10,16 @@ export const UpdateStudentAccount = asyncHandler(async (req, res, next) => {
   const { fullName, about, links } = req.body;
   const user = await userModel.findById(req.user._id);
 
-  // Update name (split first & last)
   if (fullName) {
     const nameParts = fullName.trim().split(" ");
     user.firstName = nameParts.shift();
     user.lastName = nameParts.join(" ");
   }
 
-  // Update about
   if (about) {
     user.about = about;
   }
 
-  // Update links
   if (links && typeof links === "object") {
     user.links = {
       linkedin: links.linkedin ?? user.links?.linkedin,
@@ -36,6 +33,19 @@ export const UpdateStudentAccount = asyncHandler(async (req, res, next) => {
     msg: "User account updated successfully",
     user,
   });
+});
+
+// ========================== getLoginStudent ==========================
+export const getLoginStudent = asyncHandler(async (req, res, next) => {
+  const user = await userModel
+    .findById(req.user._id)
+    .select("-notifications -DOB -provider -isConfirmed -isDeleted -password -otp");
+
+  if (!user) return next(new Error("User not found", { cause: 404 }));
+
+  user.mobileNumber = await decrypt(user.mobileNumber);
+
+  return res.status(200).json({ msg: "My Profile", user });
 });
 
 // ========================== Skills ==========================
@@ -77,9 +87,7 @@ export const deleteSkill = asyncHandler(async (req, res, next) => {
 // ========================== Projects ==========================
 export const addProject = asyncHandler(async (req, res, next) => {
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return res.status(404).json({ message: "Student not found" });
-  }
+  if (!student) return res.status(404).json({ message: "Student not found" });
 
   student.projects.push(req.body);
   await student.save();
@@ -92,9 +100,7 @@ export const addProject = asyncHandler(async (req, res, next) => {
 
 export const getProjects = asyncHandler(async (req, res, next) => {
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return res.status(404).json({ message: "Student not found" });
-  }
+  if (!student) return res.status(404).json({ message: "Student not found" });
 
   return res.status(201).json({
     message: "Projects retrieved successfully",
@@ -106,14 +112,10 @@ export const updateProject = asyncHandler(async (req, res, next) => {
   const { projectId } = req.params;
 
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return res.status(404).json({ message: "Student not found" });
-  }
+  if (!student) return res.status(404).json({ message: "Student not found" });
 
   const project = student.projects.id(projectId);
-  if (!project) {
-    return res.status(404).json({ message: "Project not found" });
-  }
+  if (!project) return res.status(404).json({ message: "Project not found" });
 
   if (student.userId.toString() !== req.user._id.toString()) {
     return next(
@@ -134,14 +136,10 @@ export const deleteProject = asyncHandler(async (req, res, next) => {
   const { projectId } = req.params;
 
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return res.status(404).json({ message: "Student not found" });
-  }
+  if (!student) return res.status(404).json({ message: "Student not found" });
 
   const project = student.projects.id(projectId);
-  if (!project) {
-    return res.status(404).json({ message: "Project not found" });
-  }
+  if (!project) return res.status(404).json({ message: "Project not found" });
 
   if (student.userId.toString() !== req.user._id.toString()) {
     return next(
@@ -152,21 +150,15 @@ export const deleteProject = asyncHandler(async (req, res, next) => {
   project.deleteOne();
   await student.save();
 
-  return res.status(200).json({
-    message: "Project deleted successfully",
-  });
+  return res.status(200).json({ message: "Project deleted successfully" });
 });
 
 // ========================== Resume ==========================
 export const uploadResume = asyncHandler(async (req, res, next) => {
-  if (!req.file) {
-    return next(new Error("PDF file is required", { cause: 400 }));
-  }
+  if (!req.file) return next(new Error("PDF file is required", { cause: 400 }));
 
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return next(new Error("Student not found", { cause: 404 }));
-  }
+  if (!student) return next(new Error("Student not found", { cause: 404 }));
 
   if (student.resume?.public_id) {
     await cloudinary.uploader.destroy(student.resume.public_id, {
@@ -184,7 +176,6 @@ export const uploadResume = asyncHandler(async (req, res, next) => {
     secure_url: uploadResult.secure_url,
     public_id: uploadResult.public_id,
   };
-
   await student.save();
 
   return res.status(200).json({
@@ -196,9 +187,7 @@ export const uploadResume = asyncHandler(async (req, res, next) => {
 
 export const downloadResume = asyncHandler(async (req, res, next) => {
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return next(new Error("Student not found", { cause: 404 }));
-  }
+  if (!student) return next(new Error("Student not found", { cause: 404 }));
 
   if (!student.resume?.secure_url) {
     return next(new Error("No resume uploaded yet", { cause: 404 }));
@@ -211,14 +200,10 @@ export const downloadResume = asyncHandler(async (req, res, next) => {
 
 // ========================== Profile Picture ==========================
 export const UploadProfilePic = asyncHandler(async (req, res, next) => {
-  if (!req.file) {
-    return next(new Error("Image file is required", { cause: 400 }));
-  }
+  if (!req.file) return next(new Error("Image file is required", { cause: 400 }));
 
   const student = await studentModel.findOne({ userId: req.user._id });
-  if (!student) {
-    return next(new Error("Student not found", { cause: 404 }));
-  }
+  if (!student) return next(new Error("Student not found", { cause: 404 }));
 
   if (student.avatar?.public_id) {
     await cloudinary.uploader.destroy(student.avatar.public_id);
@@ -233,12 +218,33 @@ export const UploadProfilePic = asyncHandler(async (req, res, next) => {
     secure_url: uploadResult.secure_url,
     public_id: uploadResult.public_id,
   };
-
   await student.save();
 
-  return res.status(200).json({
-    avatar: uploadResult.secure_url,
-  });
+  return res.status(200).json({ avatar: uploadResult.secure_url });
+});
+
+// ========================== uploadPice (profilePic) ==========================
+export const uploadPice = asyncHandler(async (req, res, next) => {
+  if (req.file) {
+    if (req.user?.profilePic?.length > 0) {
+      await cloudinary.uploader.destroy(req.user.profilePic[0].public_id);
+    }
+
+    const { secure_url, public_id } = await cloudinary.uploader.upload(
+      req.file.path,
+      { folder: "users" }
+    );
+
+    const updatedUser = await userModel.findByIdAndUpdate(
+      req.user._id,
+      { profilePic: [{ secure_url, public_id }] },
+      { new: true }
+    );
+
+    return res.status(201).json({ msg: "done", user: updatedUser });
+  } else {
+    return next(new Error("No file uploaded", { cause: 400 }));
+  }
 });
 
 // ========================== Other User ==========================
@@ -249,9 +255,7 @@ export const getAnotherUser = asyncHandler(async (req, res, next) => {
     .findById(id)
     .select("firstName lastName mobileNumber profilePic coverPic");
 
-  if (!doc) {
-    return res.status(404).json({ msg: "User not found" });
-  }
+  if (!doc) return res.status(404).json({ msg: "User not found" });
 
   const user = doc.toObject({ virtuals: true });
   user.mobileNumber = await decrypt(user.mobileNumber);
@@ -259,7 +263,7 @@ export const getAnotherUser = asyncHandler(async (req, res, next) => {
   return res.status(200).json({ msg: "My Profile", user });
 });
 
-// ========================== Password ==========================
+// ========================== Update Password ==========================
 export const updatePassword = asyncHandler(async (req, res, next) => {
   const { oldPassword, newPassword } = req.body;
 
@@ -285,4 +289,50 @@ export const softDelete = asyncHandler(async (req, res, next) => {
   return res.status(200).json({ msg: "Account Deleted Successfully" });
 });
 
+// ========================== Upload Cover Pic ==========================
+export const UploadCoverPic = asyncHandler( async (req, res, next)=>{
+    const user = await userModel.findById(req.user._id)
+    //delete old profile pic
+    if(user.coverPic.public_id){
+        await cloudinary.uploader.destroy(user.coverPic.public_id)
+    }
+    //upload profile pic to cloudinary
+    const {secure_url, public_id} = await cloudinary.uploader.upload(req.file.path, {
+        folder: "cover pics"
+    })
+    const coverPic = {secure_url, public_id}
+    await userModel.updateOne({_id: req.user._id}, {coverPic})
+    return res.status(200).json({msg: "Cover Pic uploaded successfully"})
+})
+
+// ========================== Delete Profile Pic ==========================
+export const deleteProfilePic = asyncHandler( async (req, res, next)=>{
+    const user = await userModel.findById(req.user._id)
+    if (!user.profilePic.public_id) {
+        return next(new Error("Profile picture not found!", { cause: 404 }));
+    }
+    // Delete the image from Cloudinary
+    const result = await cloudinary.uploader.destroy( user.profilePic.public_id);    
+    if (result.result !== "ok") {
+        return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
+    }
+    await userModel.updateOne({_id: req.user._id}, {$unset: {profilePic:""}})
+    return res.status(200).json({msg: "Profile Pic deleted successfully"})
+})
+
+
+// ========================== Delete Cover Pic ==========================
+export const deleteCoverPic = asyncHandler( async (req, res, next)=>{
+    const user = await userModel.findById(req.user._id)
+    if (!user.coverPic.public_id) {
+        return next(new Error("Cover picture not found!", { cause: 404 }));
+    }
+    // Delete the image from Cloudinary
+    const result = await cloudinary.uploader.destroy(user.coverPic.public_id);
+    if (result.result !== "ok") {
+        return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
+    }
+    await userModel.updateOne({_id: req.user._id}, {$unset: {coverPic:""}})
+    return res.status(200).json({msg: "Cover Pic deleted successfully"})
+})
 // export const saveInternship = asyncHandler(async(req,res,next)=>{})

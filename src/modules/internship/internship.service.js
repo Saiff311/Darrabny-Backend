@@ -31,7 +31,6 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   // Create internship
   const internship = await internshipModel.create({
     ...req.body,
-    companyId: company._id,
     addedBy: company._id,
   });
 

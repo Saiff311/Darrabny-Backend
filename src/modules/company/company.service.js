@@ -235,7 +235,8 @@ export const deleteCompanyCover = asyncHandler(async (req, res, next) => {
 export const companySignup = asyncHandler(async (req, res, next) => {
   const {
     companyName,
-    companyEmail,
+    email,
+    companyPhone,
     password,
     confirmPassword,
     description,
@@ -244,23 +245,26 @@ export const companySignup = asyncHandler(async (req, res, next) => {
     numberOfEmployees,
   } = req.body;
 
-  // Check duplicate
+  // duplicate check
   const companyExist = await companyModel.findOne({
-    $or: [{ companyName }, { companyEmail }],
+    $or: [{ email }, { companyName }, { companyPhone }],
   });
 
   if (companyExist) {
     return next(
-      new Error("Company email or name already exists!", { cause: 409 }),
+      new Error("Company email, phone, or name already exists!", {
+        cause: 409,
+      })
     );
   }
 
-  // Remove confirm password
   delete req.body.confirmPassword;
-
+  console.log(req.body);
+  
   const newCompany = await companyModel.create({
     companyName,
-    companyEmail,
+    email,
+    companyPhone,
     password,
     description,
     industry,
@@ -268,7 +272,7 @@ export const companySignup = asyncHandler(async (req, res, next) => {
     numberOfEmployees,
   });
 
-  return res.status(201).json({
+  return res.status(200).json({
     msg: "Company registered successfully",
     company: newCompany,
   });
@@ -276,11 +280,11 @@ export const companySignup = asyncHandler(async (req, res, next) => {
 
 // ========================== Company Login ==========================
 export const companyLogin = asyncHandler(async (req, res, next) => {
-  const { companyEmail, password } = req.body;
+  const { email, password } = req.body;
 
   // Find company (not deleted)
   const company = await companyModel.findOne({
-    companyEmail,
+    email,
     deletedAt: { $exists: false },
   });
 

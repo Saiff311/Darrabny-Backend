@@ -31,7 +31,7 @@ const companySchema = new mongoose.Schema(
       from: { type: Number, min: 0, required: true },
       to: { type: Number, min: 0, required: true },
     },
-    companyEmail: {
+    email: {
       type: String,
       required: true,
       unique: true,
@@ -39,7 +39,13 @@ const companySchema = new mongoose.Schema(
       trim: true,
       match: /^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/,
     },
-
+    companyPhone: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      match: /^[0-9+\-\s]{7,20}$/,
+    },
     // ===================== AUTH FIELD =====================
     password: {
       type: String,
