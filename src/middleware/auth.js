@@ -23,6 +23,9 @@ export const auth = (accessRoles = [])=>{
         else if(bearer === process.env.ADMIN_BEARER){
             secretKey = process.env.ADMIN_SECRET_KEY
         }
+        else if(bearer === process.env.COMPANY_BEARER){
+            secretKey = process.env.COMPANY_SECRET_KEY
+        }
         else{
             return next(new Error("Invalid bearer!",{cause: 400}))
         }

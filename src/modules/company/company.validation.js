@@ -117,3 +117,6 @@ export const companyLoginSchema = joi.object({
   companyEmail: generalRules.email.required(),
   password: joi.string().required(),
 });
+
+// ------------------ Company Dashboard ------------------
+export const companyDashboardSchema = joi.object().length(0)

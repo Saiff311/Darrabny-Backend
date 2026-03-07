@@ -98,4 +98,12 @@ companyRouter.post(
   CS.companyLogin,
 );
 
+// ------------------ Company Dashboard ------------------
+companyRouter.post(
+  "/Dashboard",
+  auth([roles.company]),
+  validation(CV.companyDashboardSchema),
+  CS.companyDashboard,
+);
+
 export default companyRouter;

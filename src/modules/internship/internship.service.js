@@ -43,6 +43,20 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const getInternship = asyncHandler(async (req, res, next) => {
+  const { internshipId } = req.params;
+
+  const internship = await internshipModel.findById({_id: internshipId, deletedAt: {$exists: false}})
+
+  if (!internship) return next(new Error("internship not found!", { cause: 404 }));
+
+  return res.status(201).json({
+    success: true,
+    message: "internship fetched successfully",
+    data: internship,
+  });
+});
+
 export const updateInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
   req.body.updatedBy = req.user._id;
@@ -142,35 +156,47 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
   });
 });
 //view internship details
-export const getInternshipById = asyncHandler(async (req, res, next) => {
-  const { internshipId } = req.params;
-  //check saved internships by user
-  const user = await userModel
-    .findById(req.user._id)
-    .select("savedInternships");
-  const savedInternshipsIds = user?.savedInternships || [];
+// export const getInternshipById = asyncHandler(async (req, res, next) => {
+//   const { internshipId } = req.params;
+//   //check saved internships by user
+//   const user = await userModel
+//     .findById(req.user._id)
+//     .select("savedInternships");
+//   const savedInternshipsIds = user?.savedInternships || [];
 
-  const internship = await internshipModel
-    .findById(internshipId)
-    .populate("companyId", "companyName")
-    .aggregate([
-      {
-        $addFields: {
-          isSaved: { $in: ["$_id", savedInternshipsIds] },
-        },
-      },
-    ]);
+// await internshipModel.aggregate([
+//   {
+//     $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+//   },
+//   {
+//     $addFields: {
+//       isSaved: { $in: ["$_id", savedInternshipsIds] }
+//     }
+//   }
+// ])
 
-  if (!internship) {
-    return next(new Error("internship not found", { cause: 404 }));
-  }
-  return res.status(200).json({
-    success: true,
-    message: "internship fetched successfully",
-    data: internship,
-  });
-});
+//   const internship = await internshipModel.aggregate([
+//     {
+//       $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+//     },
+//     {
+//       $addFields: {
+//         isSaved: { $in: ["$_id", savedInternshipsIds] }
+//       }
+//     }
+//   ]);
 
+//   if (!internship || internship.length === 0) {
+//     return next(new Error("internship not found", { cause: 404 }));
+//   }
+//   return res.status(200).json({
+//     success: true,
+//     message: "internship fetched successfully",
+//     data: internship,
+//   });
+// });
+
+//------------ Get filtered internships by company -------------
 export const getFilteredInternships = asyncHandler(async (req, res, next) => {
   const { page = 1, limit = 6, sort = "-createdAt", ...filters } = req.query;
   const skip = (page - 1) * limit;

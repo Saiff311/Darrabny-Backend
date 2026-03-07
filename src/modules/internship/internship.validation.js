@@ -20,7 +20,6 @@ export const updateInternshipSchema = Joi.object({
     technicalSkills:Joi.array().items(Joi.string()).min(1),
     softSkills:Joi.array().items(Joi.string()).min(1),
     internshipId:generalRules.id.required(),
-    companyId:generalRules.id.required(),
     closed: Joi.boolean()
 })
 

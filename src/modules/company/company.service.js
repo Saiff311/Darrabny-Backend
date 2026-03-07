@@ -291,3 +291,11 @@ export const companyLogin = asyncHandler(async (req, res, next) => {
 
   return res.status(200).json({ msg: "Login successful", company, token });
 });
+
+// ------------------ Company Dashboard ------------------
+export const companyDashboard = asyncHandler(async (req, res, next) => {
+  const { companyEmail, password } = req.body;
+  
+
+  return res.status(200).json({ msg: "Login successful", company, token });
+});
