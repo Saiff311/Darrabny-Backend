@@ -56,10 +56,17 @@ const internshipSchema = new mongoose.Schema(
       enum: Object.values(internshipStatus),
       default: internshipStatus.onboarding,
     },
-    // startDate: {
-    //   type: Date,
-    //   required: true,
-    // },
+
+    startDate: {
+      type: Date,
+      required: true,
+    },
+
+    durationInMonths: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
 
     // endDate: {
     //   type: Date,
