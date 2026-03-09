@@ -76,10 +76,10 @@ const internshipSchema = new mongoose.Schema(
       type: String,
     },
 
-    addedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "user",
-    },
+    // addedBy: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "user",
+    // },
 
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -91,11 +91,11 @@ const internshipSchema = new mongoose.Schema(
       default: false,
     },
 
-    // companyId: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "company",
-    //   required: true,
-    // },
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "company",
+      required: true,
+    },
 
     deletedAt: Date,
   },
@@ -108,7 +108,7 @@ const internshipSchema = new mongoose.Schema(
 
 // Indexes
 internshipSchema.index({ endDate: 1 });
-internshipSchema.index({ addedBy: 1 });
+internshipSchema.index({ companyId: 1 });
 
 // Virtual Applications
 internshipSchema.virtual("Applications", {

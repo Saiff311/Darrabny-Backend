@@ -104,4 +104,6 @@ companyRouter.get(
   validation(CV.getCompanyApplicationsSchema, "query"),
   CS.getCompanyApplications
 );
+
+
 export default companyRouter;

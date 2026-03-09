@@ -134,3 +134,4 @@ export const getCompanyApplicationsSchema = joi.object({
 
   sort: joi.string().valid("newest").default("newest"),
 });
+

@@ -31,7 +31,7 @@ internshipRouter.get("/my",
 
 internshipRouter.patch("/:internshipId",
     validation(JV.updateInternshipSchema),
-    auth(Object.values(roles)),
+    auth([roles.company, roles.admin]),
     JS.updateInternship
 )
 
@@ -45,7 +45,7 @@ internshipRouter.delete(
 
 // Get company internships
 internshipRouter.get(
-  "/companyInternships/:companyId?",
+  "/companyInternships",
   validation(JV.getCompanyInternshipsSchema),
   auth(Object.values(roles)),
   JS.getCompanyInternships,

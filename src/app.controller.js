@@ -73,8 +73,9 @@ const bootstrap = (app, express) => {
 
   app.use("/auth", authRouter);
   app.use("/user", userRouter);
-  app.use("/student", studentRouter); // Etoo
+  app.use("/student", studentRouter);
   app.use("/company", companyRouter);
+  app.use("/internship", internshipRouter);
   app.use("/admin", adminRouter);
   app.use("/chat", chatRouter);
   app.use("/internship", internshipRouter);

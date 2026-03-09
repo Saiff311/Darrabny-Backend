@@ -31,12 +31,28 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   // Create internship
   const internship = await internshipModel.create({
     ...req.body,
-    addedBy: company._id,
+    companyId: company._id,
   });
-
+ 
   return res.status(201).json({
     success: true,
     message: "Internship added successfully",
+    data: internship,
+  });
+});
+
+
+// ========================== Get Internship By ID ==========================
+export const getInternship = asyncHandler(async (req, res, next) => {
+  const { internshipId } = req.params;
+
+  const internship = await internshipModel.findById({_id: internshipId, deletedAt: {$exists: false}})
+
+  if (!internship) return next(new Error("internship not found!", { cause: 404 }));
+
+  return res.status(201).json({
+    success: true,
+    message: "internship fetched successfully",
     data: internship,
   });
 });
@@ -103,19 +119,15 @@ export const deleteInternship = asyncHandler(async (req, res, next) => {
 
 // ========================== Get Company Internships ==========================
 export const getCompanyInternships = asyncHandler(async (req, res, next) => {
-  const { companyId } = req.params;
+  // Get company ID from params or query
+  const companyId = req.company._id;
+
   const { page = 1, limit = 6, sort = "-createdAt", companyName } = req.query;
   const skip = (page - 1) * limit;
 
   let query = { companyId };
 
-  // Get saved internships for user
-  const user = await userModel
-    .findById(req.user._id)
-    .select("savedInternships");
-  const savedInternshipsIds = user?.savedInternships || [];
-
-  // Search by company name
+  // If companyName is provided, find company by name and get its ID
   if (companyName) {
     const company = await companyModel.findOne({
       companyName: { $regex: escapeRegex(companyName), $options: "i" },
@@ -134,14 +146,7 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     .sort(sort)
     .skip(skip)
     .limit(limit)
-    .populate("companyId", "companyName")
-    .aggregate([
-      {
-        $addFields: {
-          isSaved: { $in: ["$_id", savedInternshipsIds] },
-        },
-      },
-    ]);
+    .populate("companyId", "companyName");
 
   const totalCount = await internshipModel.countDocuments(query);
 
@@ -154,7 +159,7 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     message: "internships fetched successfully",
     data: internships,
     pagination: {
-      currentPage: page,
+      currentPage: Number(page),
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
     },
@@ -170,17 +175,25 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
     .findById(req.user._id)
     .select("savedInternships");
   const savedInternshipsIds = user?.savedInternships || [];
+//view internship details
+// export const getInternshipById = asyncHandler(async (req, res, next) => {
+//   const { internshipId } = req.params;
+//   //check saved internships by user
+//   const user = await userModel
+//     .findById(req.user._id)
+//     .select("savedInternships");
+//   const savedInternshipsIds = user?.savedInternships || [];
 
-  const internship = await internshipModel
-    .findById(internshipId)
-    .populate("companyId", "companyName")
-    .aggregate([
-      {
-        $addFields: {
-          isSaved: { $in: ["$_id", savedInternshipsIds] },
-        },
-      },
-    ]);
+// await internshipModel.aggregate([
+//   {
+//     $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+//   },
+//   {
+//     $addFields: {
+//       isSaved: { $in: ["$_id", savedInternshipsIds] }
+//     }
+//   }
+// ])
 
   if (!internship) {
     return next(new Error("internship not found", { cause: 404 }));
@@ -194,6 +207,28 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
 });
 
 // ========================== Get Filtered Internships ==========================
+//   const internship = await internshipModel.aggregate([
+//     {
+//       $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+//     },
+//     {
+//       $addFields: {
+//         isSaved: { $in: ["$_id", savedInternshipsIds] }
+//       }
+//     }
+//   ]);
+
+//   if (!internship || internship.length === 0) {
+//     return next(new Error("internship not found", { cause: 404 }));
+//   }
+//   return res.status(200).json({
+//     success: true,
+//     message: "internship fetched successfully",
+//     data: internship,
+//   });
+// });
+
+//------------ Get filtered internships by company -------------
 export const getFilteredInternships = asyncHandler(async (req, res, next) => {
   const { page = 1, limit = 6, sort = "-createdAt", ...filters } = req.query;
   const skip = (page - 1) * limit;

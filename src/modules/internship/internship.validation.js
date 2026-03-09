@@ -48,14 +48,13 @@ export const responseAppSchema = Joi.object({
 
 // ========================== Get Company Internships Validation ==========================
 export const getCompanyInternshipsSchema = Joi.object({
-  companyId: generalRules.id,
-  companyName: Joi.string().trim().min(3).max(50),
+  companyName: Joi.string().trim().min(3).max(50).optional(),
   page: Joi.number().min(1).default(1),
   limit: Joi.number().min(1).max(30).default(6),
   sort: Joi.string()
     .valid("createdAt", "-createdAt", "internshipTittle", "-internshipTittle")
     .default("-createdAt"),
-}).or("companyId", "companyName");
+});
 
 // ========================== Internship ID Validation ==========================
 export const InternshipIdSchema = Joi.object({

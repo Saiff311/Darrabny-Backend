@@ -371,3 +371,4 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
     }
   });
 });
+
