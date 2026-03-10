@@ -104,4 +104,19 @@ companyRouter.get(
   validation(CV.getCompanyApplicationsSchema, "query"),
   CS.getCompanyApplications
 );
+
+// ------------------ Display Company Verification ------------------
+companyRouter.get(
+  "/verification",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.companyVerification
+);
+
+companyRouter.get(
+  "/dashboard",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.getCompanyDashboard
+);
 export default companyRouter;

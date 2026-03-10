@@ -1,6 +1,7 @@
 import applicationModel from "../../DB/models/application.model.js";
 import companyModel from "../../DB/models/company.model.js";
 import internshipModel from "../../DB/models/internship.model.js";
+import { internshipAssignmentModel } from "../../DB/models/InternshipAssignment.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
@@ -370,4 +371,96 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
       totalPages
     }
   });
+});
+
+// ========================== Display Company Verification ==========================
+export const companyVerification = asyncHandler(async (req, res, next) => {
+    const companyId = req.company
+    const company = await companyModel.findById(companyId)
+  return res.status(200).json({
+    msg: "Verification details retrieved",
+    status: company.verificationStatus,
+    validUntil: company.validUntil });
+});
+
+// ========================= Company Dashboard ==========================
+export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
+
+  const companyId = req.company._id;
+
+  let stats = {
+    totalApplicants: 0,
+    applicantsGrowth: 0,
+    totalCompletedTrainees: 0,
+    activePostings: {
+      total: 0,
+      internships: 0,
+    },
+    acceptanceRate: 0,
+  };
+
+  let ongoingInternships = [];
+
+  let verification = {
+    status: "pending",
+    validUntil: null,
+  };
+
+    // total applicants
+    const totalApplicants = await applicationModel.countDocuments({
+      company: companyId,
+    });
+    stats.totalApplicants = totalApplicants;
+
+    // active internships
+    const internships = await internshipModel.countDocuments({
+      company: companyId,
+      status: "inProgress",
+    });
+
+    stats.activePostings.internships = internships;
+    stats.activePostings.total = internships;
+
+    // completed trainees
+    const completed = await internshipAssignmentModel.countDocuments({
+      company: companyId,
+      status: "completed",
+    });
+
+    stats.totalCompletedTrainees = completed;
+
+
+  try {
+
+    // ongoing interns preview
+    ongoingInternships = await internshipAssignmentModel
+      .find({
+        company: companyId,
+        status: { $in: ["onboarding", "in-progress"] },
+      })
+      .limit(3)
+      .populate("student", "name")
+      .populate("internship", "title");
+
+  } catch (err) {
+    ongoingInternships = [];
+  }
+
+
+    const company = await companyModel
+      .findById(companyId)
+      .select("verificationStatus");
+
+    if (company) {
+      verification = {
+        status: company.verificationStatus || "pending"
+      };
+    }
+
+  return res.status(200).json({
+    stats,
+    ongoingInternships,
+    verification,
+  });
+
 });
