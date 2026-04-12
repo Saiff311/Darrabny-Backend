@@ -3,27 +3,44 @@ import { generalRules } from "../../utils/generalRules.js";
 import {
   appStatus,
   internshipLocations,
-  seniorityLevels,
+  internshipStatus,
   workingTimes,
 } from "../../utils/enums.js";
 
 // ========================== Add Internship Validation ==========================
 export const addInternshipSchema = Joi.object({
   internshipTittle: Joi.string().trim().required(),
+
   internshipLocation: Joi.string()
     .valid(...Object.values(internshipLocations))
     .required(),
+
   workingTime: Joi.string()
     .valid(...Object.values(workingTimes))
     .required(),
-  internshipDescription: Joi.string().trim().min(10).required(),
-  technicalSkills: Joi.array().items(Joi.string()).min(1).required(),
-  softSkills: Joi.array().items(Joi.string()).min(1).required(),
-  seniorityLevel: Joi.string()
-    .valid(...Object.values(seniorityLevels))
-    .required(),
-});
 
+  internshipDescription: Joi.string().trim().min(10).required(),
+
+  technicalSkills: Joi.alternatives()
+    .try(Joi.array().items(Joi.string()), Joi.string())
+    .required(),
+
+  softSkills: Joi.alternatives()
+    .try(Joi.array().items(Joi.string()), Joi.string())
+    .required(),
+
+  status: Joi.string()
+    .valid(...Object.values(internshipStatus))
+    .optional(),
+
+  startDate: Joi.date().required(),
+
+  durationInMonths: Joi.number().integer().min(1).required(),
+
+  thumbnail: Joi.string().uri().optional(),
+
+  closed: Joi.boolean().optional(),
+});
 // ========================== Update Internship Validation ==========================
 export const updateInternshipSchema = Joi.object({
   internshipTittle: Joi.string().trim(),
@@ -33,7 +50,6 @@ export const updateInternshipSchema = Joi.object({
   technicalSkills: Joi.array().items(Joi.string()).min(1),
   softSkills: Joi.array().items(Joi.string()).min(1),
   internshipId: generalRules.id.required(),
-  companyId: generalRules.id.required(),
   closed: Joi.boolean(),
 });
 
@@ -48,14 +64,13 @@ export const responseAppSchema = Joi.object({
 
 // ========================== Get Company Internships Validation ==========================
 export const getCompanyInternshipsSchema = Joi.object({
-  companyId: generalRules.id,
-  companyName: Joi.string().trim().min(3).max(50),
+  companyName: Joi.string().trim().min(3).max(50).optional(),
   page: Joi.number().min(1).default(1),
   limit: Joi.number().min(1).max(30).default(6),
   sort: Joi.string()
     .valid("createdAt", "-createdAt", "internshipTittle", "-internshipTittle")
     .default("-createdAt"),
-}).or("companyId", "companyName");
+});
 
 // ========================== Internship ID Validation ==========================
 export const InternshipIdSchema = Joi.object({

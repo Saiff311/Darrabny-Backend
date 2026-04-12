@@ -373,6 +373,7 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
   });
 });
 
+
 // ========================== Display Company Verification ==========================
 export const companyVerification = asyncHandler(async (req, res, next) => {
     const companyId = req.company
@@ -464,3 +465,4 @@ export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
   });
 
 });
+

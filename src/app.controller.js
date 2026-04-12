@@ -63,6 +63,9 @@ import cors from "cors";
 import path from "path";
 import { adminGraphQLSchema } from "./modules/Admin/graphql/admin.graphql.js";
 import internshipRouter from "./modules/internship/internship.controller.js";
+import applicationRouter from "./modules/application/applicaion.controller.js";
+import placementRouter from "./modules/placement/placement.controller.js";
+import reportRouter from "./modules/report/report.controller.js";
 
 const bootstrap = (app, express) => {
   connectDB();
@@ -73,11 +76,14 @@ const bootstrap = (app, express) => {
 
   app.use("/auth", authRouter);
   app.use("/user", userRouter);
-  app.use("/student", studentRouter); // Etoo
+  app.use("/student", studentRouter);
   app.use("/company", companyRouter);
+  app.use("/internship", internshipRouter);
   app.use("/admin", adminRouter);
   app.use("/chat", chatRouter);
-  app.use("/internship", internshipRouter);
+  app.use("/application", applicationRouter);
+  app.use("/placement", placementRouter);
+  app.use("/report", reportRouter);
 
   app.use(
     "/graphql",

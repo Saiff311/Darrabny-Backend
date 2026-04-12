@@ -50,10 +50,19 @@ const internshipSchema = new mongoose.Schema(
       enum: Object.values(internshipStatus),
       default: internshipStatus.onboarding,
     },
+
     startDate: {
       type: Date,
       required: true,
     },
+
+
+    durationInMonths: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
 
     endDate: {
       type: Date,
@@ -70,10 +79,10 @@ const internshipSchema = new mongoose.Schema(
       type: String,
     },
 
-    addedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "user",
-    },
+    // addedBy: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "user",
+    // },
 
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -90,6 +99,7 @@ const internshipSchema = new mongoose.Schema(
       ref: "company",
       required: true,
     },
+
     deletedAt: Date,
   },
   {
@@ -101,7 +111,7 @@ const internshipSchema = new mongoose.Schema(
 
 // Indexes
 internshipSchema.index({ endDate: 1 });
-internshipSchema.index({ addedBy: 1 });
+internshipSchema.index({ companyId: 1 });
 
 // Virtual Applications
 internshipSchema.virtual("Applications", {

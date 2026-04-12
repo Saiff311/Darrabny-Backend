@@ -135,5 +135,7 @@ export const getCompanyApplicationsSchema = joi.object({
   sort: joi.string().valid("newest").default("newest"),
 });
 
+
 // ------------------ emptySchema ------------------
 export const emptySchema = joi.object().length(0);
+

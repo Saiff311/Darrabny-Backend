@@ -113,10 +113,12 @@ companyRouter.get(
   CS.companyVerification
 );
 
+// ------------------ Get Company Dashboard (not completed) ------------------
 companyRouter.get(
   "/dashboard",
   auth([roles.company]),
   validation(CV.emptySchema),
   CS.getCompanyDashboard
 );
+
 export default companyRouter;

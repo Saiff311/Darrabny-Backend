@@ -11,8 +11,9 @@ const internshipRouter = Router();
 // Add internship (company only)
 internshipRouter.post(
   "/add",
-  validation(JV.addInternshipSchema),
   auth(["company"]),
+  hostMulter(fileTypes.image).single("thumbnail"),
+  validation(JV.addInternshipSchema),
   JS.addInternship,
 );
 
@@ -29,9 +30,10 @@ internshipRouter.get("/my",
     JS.getStudentInternships
 )
 
+// Update internship
 internshipRouter.patch("/:internshipId",
     validation(JV.updateInternshipSchema),
-    auth(Object.values(roles)),
+    auth([roles.company, roles.admin]),
     JS.updateInternship
 )
 
@@ -45,7 +47,7 @@ internshipRouter.delete(
 
 // Get company internships
 internshipRouter.get(
-  "/companyInternships/:companyId?",
+  "/companyInternships",
   validation(JV.getCompanyInternshipsSchema),
   auth(Object.values(roles)),
   JS.getCompanyInternships,
@@ -56,7 +58,7 @@ internshipRouter.get(
   "/:internshipId",
   validation(JV.InternshipIdSchema),
   auth(Object.values(roles)),
-  JS.getInternshipById,
+  JS.getInternship,
 );
 
 

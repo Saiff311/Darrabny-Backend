@@ -7,6 +7,7 @@ import { escapeRegex } from "../../utils/security/escapeRegax.js";
 import userModel from "../../DB/models/user.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import { internshipStatus } from "../../utils/enums.js";
+import cloudinary from "../../utils/cloudinary.js";
 
 // ========================== Add Internship ==========================
 export const addInternship = asyncHandler(async (req, res, next) => {
@@ -16,24 +17,54 @@ export const addInternship = asyncHandler(async (req, res, next) => {
     return next(new Error("Company authentication required", { cause: 401 }));
   }
 
-  // Company must be approved
   if (!company.approvedByAdmin) {
-    return next(
-      new Error("Company is not approved by admin yet", { cause: 403 }),
-    );
+    return next(new Error("Company is not approved by admin yet", { cause: 403 }));
   }
 
-  // Company must not be deleted or banned
   if (company.deletedAt || company.bannedAt) {
     return next(new Error("Company is deleted or banned", { cause: 403 }));
   }
 
-  // Create internship
+  let thumbnailUrl = null;
+
+  if (req.file) {
+    const { secure_url } = await cloudinary.uploader.upload(req.file.path, {
+      folder: "internships",
+    });
+
+    thumbnailUrl = secure_url;
+  }
+
+  // تحويل technicalSkills
+  let technicalSkillsArr = [];
+  if (typeof req.body.technicalSkills === "string") {
+    technicalSkillsArr = req.body.technicalSkills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } else if (Array.isArray(req.body.technicalSkills)) {
+    technicalSkillsArr = req.body.technicalSkills;
+  }
+
+  // تحويل softSkills
+  let softSkillsArr = [];
+  if (typeof req.body.softSkills === "string") {
+    softSkillsArr = req.body.softSkills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } else if (Array.isArray(req.body.softSkills)) {
+    softSkillsArr = req.body.softSkills;
+  }
+
   const internship = await internshipModel.create({
     ...req.body,
-    addedBy: company._id,
+    companyId: company._id,
+    technicalSkills: technicalSkillsArr,
+    softSkills: softSkillsArr,
+    thumbnail: thumbnailUrl,
   });
-
+ 
   return res.status(201).json({
     success: true,
     message: "Internship added successfully",
@@ -41,81 +72,81 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   });
 });
 
+
+// ========================== Get Internship By ID ==========================
+export const getInternship = asyncHandler(async (req, res, next) => {
+  const { internshipId } = req.params;
+
+  const internship = await internshipModel.findById({_id: internshipId, deletedAt: {$exists: false}})
+
+  if (!internship) return next(new Error("internship not found!", { cause: 404 }));
+
+  return res.status(201).json({
+    success: true,
+    message: "internship fetched successfully",
+    data: internship,
+  });
+});
+
 // ========================== Update Internship ==========================
 export const updateInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
-  req.body.updatedBy = req.user._id;
+
+  const companyId = req.company._id;
+
+  req.body.updatedBy = companyId;
 
   const internship = await internshipModel.findOneAndUpdate(
-    { _id: internshipId, addedBy: req.user._id },
+    { _id: internshipId, companyId },
     req.body,
     { new: true },
   );
 
   if (!internship) {
-    return next(new Error("internship not found", { cause: 404 }));
+    return next(new Error("Internship not found", { cause: 404 }));
   }
 
-  return res.status(201).json({
+  return res.status(200).json({
     success: true,
-    message: "internship updated successfully",
+    message: "Internship updated successfully",
     data: internship,
   });
 });
-
 // ========================== Delete Internship ==========================
 export const deleteInternship = asyncHandler(async (req, res, next) => {
-  const { internshipId, companyId } = req.params;
+  const { internshipId } = req.params;
 
-  const company = await companyModel.findById(companyId);
-  if (!company) {
-    return next(new Error("Company not found", { cause: 404 }));
-  }
+  const companyId = req.company._id;
 
   const internship = await internshipModel.findById(internshipId);
   if (!internship) {
-    return next(new Error("internship not found", { cause: 404 }));
+    return next(new Error("Internship not found", { cause: 404 }));
   }
 
-  // Authorization check
-  if (
-    company.createdBy.toString() !== req.user._id.toString() &&
-    !company.HRs.includes(req.user._id)
-  ) {
+  if (internship.companyId.toString() !== companyId.toString()) {
     return next(
-      new Error("You are not authorized to delete internship", { cause: 403 }),
-    );
-  }
-
-  if (company._id.toString() != internship.companyId.toString()) {
-    return next(
-      new Error("You are not authorized to delete internship", { cause: 403 }),
+      new Error("You are not authorized to delete this internship", { cause: 403 })
     );
   }
 
   await internship.deleteOne();
 
-  return res.status(201).json({
+  return res.status(200).json({
     success: true,
-    message: "internship deleted successfully",
+    message: "Internship deleted successfully",
   });
 });
-
 // ========================== Get Company Internships ==========================
 export const getCompanyInternships = asyncHandler(async (req, res, next) => {
-  const { companyId } = req.params;
+  // Get company ID from params or query
+  const companyId = req.company._id;
+
   const { page = 1, limit = 6, sort = "-createdAt", companyName } = req.query;
   const skip = (page - 1) * limit;
 
   let query = { companyId };
 
-  // Get saved internships for user
-  const user = await userModel
-    .findById(req.user._id)
-    .select("savedInternships");
-  const savedInternshipsIds = user?.savedInternships || [];
-
-  // Search by company name
+  // If companyName is provided, find company by name and get its ID
   if (companyName) {
     const company = await companyModel.findOne({
       companyName: { $regex: escapeRegex(companyName), $options: "i" },
@@ -134,14 +165,7 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     .sort(sort)
     .skip(skip)
     .limit(limit)
-    .populate("companyId", "companyName")
-    .aggregate([
-      {
-        $addFields: {
-          isSaved: { $in: ["$_id", savedInternshipsIds] },
-        },
-      },
-    ]);
+    .populate("companyId", "companyName");
 
   const totalCount = await internshipModel.countDocuments(query);
 
@@ -154,7 +178,7 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     message: "internships fetched successfully",
     data: internships,
     pagination: {
-      currentPage: page,
+      currentPage: Number(page),
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
     },
@@ -170,17 +194,25 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
     .findById(req.user._id)
     .select("savedInternships");
   const savedInternshipsIds = user?.savedInternships || [];
+//view internship details
+// export const getInternshipById = asyncHandler(async (req, res, next) => {
+//   const { internshipId } = req.params;
+//   //check saved internships by user
+//   const user = await userModel
+//     .findById(req.user._id)
+//     .select("savedInternships");
+//   const savedInternshipsIds = user?.savedInternships || [];
 
-  const internship = await internshipModel
-    .findById(internshipId)
-    .populate("companyId", "companyName")
-    .aggregate([
-      {
-        $addFields: {
-          isSaved: { $in: ["$_id", savedInternshipsIds] },
-        },
-      },
-    ]);
+// await internshipModel.aggregate([
+//   {
+//     $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+//   },
+//   {
+//     $addFields: {
+//       isSaved: { $in: ["$_id", savedInternshipsIds] }
+//     }
+//   }
+// ])
 
   if (!internship) {
     return next(new Error("internship not found", { cause: 404 }));
@@ -194,6 +226,28 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
 });
 
 // ========================== Get Filtered Internships ==========================
+//   const internship = await internshipModel.aggregate([
+//     {
+//       $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+//     },
+//     {
+//       $addFields: {
+//         isSaved: { $in: ["$_id", savedInternshipsIds] }
+//       }
+//     }
+//   ]);
+
+//   if (!internship || internship.length === 0) {
+//     return next(new Error("internship not found", { cause: 404 }));
+//   }
+//   return res.status(200).json({
+//     success: true,
+//     message: "internship fetched successfully",
+//     data: internship,
+//   });
+// });
+
+//------------ Get filtered internships by company -------------
 export const getFilteredInternships = asyncHandler(async (req, res, next) => {
   const { page = 1, limit = 6, sort = "-createdAt", ...filters } = req.query;
   const skip = (page - 1) * limit;
@@ -374,6 +428,7 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
     const application = await applicationModel.create({
       internshipId,
       userId: req.user._id,
+      companyId: internship.companyId,
       status: "pending",
       coverLetter: coverLetter?.trim() || null,
       skills: skillsArr,
