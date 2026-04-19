@@ -17,6 +17,7 @@ internshipRouter.post(
   JS.addInternship,
 );
 
+
 // Update internship
 internshipRouter.patch(
   "/:internshipId",
