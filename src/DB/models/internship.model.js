@@ -56,13 +56,11 @@ const internshipSchema = new mongoose.Schema(
       required: true,
     },
 
-
     durationInMonths: {
       type: Number,
       required: true,
       min: 1,
     },
-
 
     endDate: {
       type: Date,

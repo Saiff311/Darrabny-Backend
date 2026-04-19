@@ -4,6 +4,7 @@ import {
   appStatus,
   internshipLocations,
   internshipStatus,
+  seniorityLevels,
   workingTimes,
 } from "../../utils/enums.js";
 
@@ -27,6 +28,10 @@ export const addInternshipSchema = Joi.object({
 
   softSkills: Joi.alternatives()
     .try(Joi.array().items(Joi.string()), Joi.string())
+    .required(),
+
+  seniorityLevel: Joi.string()
+    .valid(...Object.values(seniorityLevels))
     .required(),
 
   status: Joi.string()
