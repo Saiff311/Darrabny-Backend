@@ -428,6 +428,7 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
     const application = await applicationModel.create({
       internshipId,
       userId: req.user._id,
+      companyId: internship.companyId,
       status: "pending",
       coverLetter: coverLetter?.trim() || null,
       skills: skillsArr,

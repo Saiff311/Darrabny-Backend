@@ -105,5 +105,20 @@ companyRouter.get(
   CS.getCompanyApplications
 );
 
+// ------------------ Display Company Verification ------------------
+companyRouter.get(
+  "/verification",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.companyVerification
+);
+
+// ------------------ Get Company Dashboard (not completed) ------------------
+companyRouter.get(
+  "/dashboard",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.getCompanyDashboard
+);
 
 export default companyRouter;

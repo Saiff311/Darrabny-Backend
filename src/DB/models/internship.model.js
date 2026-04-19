@@ -5,7 +5,7 @@ import { getTimeAgo } from "../../utils/local-functions/timeAgo.js";
 
 const internshipSchema = new mongoose.Schema(
   {
-    internshipTittle: {
+    internshipTitle: {
       type: String,
       required: true,
       trim: true,
@@ -45,12 +45,6 @@ const internshipSchema = new mongoose.Schema(
       },
     ],
 
-    seniorityLevel: {
-      type: String,
-      enum: ["Junior", "Mid-Level", "Senior"],
-      required: true,
-    },
-
     status: {
       type: String,
       enum: Object.values(internshipStatus),
@@ -68,16 +62,16 @@ const internshipSchema = new mongoose.Schema(
       min: 1,
     },
 
-    // endDate: {
-    //   type: Date,
-    //   required: true,
-    //   validate: {
-    //     validator: function (value) {
-    //       return value > this.startDate;
-    //     },
-    //     message: "End date must be after start date",
-    //   },
-    // },
+    endDate: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function (value) {
+          return value > this.startDate;
+        },
+        message: "End date must be after start date",
+      },
+    },
 
     thumbnail: {
       type: String,

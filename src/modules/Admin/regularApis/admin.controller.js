@@ -8,6 +8,12 @@ import { validation } from "../../../middleware/validation.js"
 
 const adminRouter = Router()
 
+// ------------------ Verify Company ------------------
+adminRouter.patch("/companies/:id/verify",
+   validation(AV.idSchema),
+    auth([roles.admin]) ,
+    AS.verifyCompany)
+
 adminRouter.patch("/ban-unBan-user/:id",
    validation(AV.idSchema),
     auth([roles.admin]) ,
@@ -17,11 +23,6 @@ adminRouter.patch("/ban-unBan-company/:id",
    validation(AV.idSchema),
     auth([roles.admin]) ,
     AS.banCompany)
-
-adminRouter.patch("/approveCompany/:id",
-   validation(AV.idSchema),
-    auth([roles.admin]) ,
-    AS.approveCompany)
 
 
 export default adminRouter
