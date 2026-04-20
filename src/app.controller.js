@@ -63,6 +63,7 @@ import cors from "cors";
 import path from "path";
 import { adminGraphQLSchema } from "./modules/Admin/graphql/admin.graphql.js";
 import internshipRouter from "./modules/internship/internship.controller.js";
+import internshipReportRouter from "./modules/internshipReport/internshipReport.controller.js";
 
 const bootstrap = (app, express) => {
   connectDB();
@@ -79,6 +80,7 @@ const bootstrap = (app, express) => {
   app.use("/admin", adminRouter);
   app.use("/chat", chatRouter);
   app.use("/internship", internshipRouter);
+  app.use("/report", internshipReportRouter);
 
   app.use(
     "/graphql",

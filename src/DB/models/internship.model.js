@@ -104,6 +104,12 @@ const internshipSchema = new mongoose.Schema(
       required: true,
     },
 
+    // supervisorId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "company_supervisor",
+    //   required: true,
+    // },
+
     deletedAt: Date,
   },
   {
@@ -120,6 +126,12 @@ internshipSchema.index({ companyId: 1 });
 // Virtual Applications
 internshipSchema.virtual("Applications", {
   ref: "application",
+  localField: "_id",
+  foreignField: "internshipId",
+});
+// Virtual reports
+internshipSchema.virtual("reports", {
+  ref: "internship_report",
   localField: "_id",
   foreignField: "internshipId",
 });
