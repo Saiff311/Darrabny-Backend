@@ -1,13 +1,41 @@
-import { asyncHandler } from "../utils/globalErrorHandling.js"
+import { asyncHandler } from "../utils/globalErrorHandling.js";
 
-export const validation = (schema)=>{
-    return asyncHandler((req,res,next)=>{
-        let inputData = {...req.body, ...req.params, ...req.query}
-            const validationObject = schema.validate(inputData,{abortEarly: false})
-            if(validationObject?.error){
-                return res.status(422).json({msg: "Validation errors", errors: validationObject?.error.details})
-                // return next(new Error("Validation Error",{cause: 422},validationObject?.error.details))
-            }
-            next()
-        })
+export const validation = (schema) => {
+  return asyncHandler((req, res, next) => {
+
+    // ✅ params
+    if (schema.params) {
+      const { error } = schema.params.validate(req.params, { abortEarly: false });
+      if (error) {
+        return res.status(422).json({
+          msg: "Validation errors",
+          errors: error.details,
+        });
+      }
     }
+
+    // ✅ body
+    if (schema.body) {
+      const { error } = schema.body.validate(req.body, { abortEarly: false });
+      if (error) {
+        return res.status(422).json({
+          msg: "Validation errors",
+          errors: error.details,
+        });
+      }
+    }
+
+    // ✅ query
+    if (schema.query) {
+      const { error } = schema.query.validate(req.query, { abortEarly: false });
+      if (error) {
+        return res.status(422).json({
+          msg: "Validation errors",
+          errors: error.details,
+        });
+      }
+    }
+
+    next();
+  });
+};

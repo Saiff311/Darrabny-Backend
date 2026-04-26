@@ -8,6 +8,7 @@ import userModel from "../../DB/models/user.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import { internshipStatus } from "../../utils/enums.js";
 import cloudinary from "../../utils/cloudinary.js";
+import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
 
 // ========================== Add Internship ==========================
 export const addInternship = asyncHandler(async (req, res, next) => {
@@ -56,6 +57,20 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   } else if (Array.isArray(req.body.softSkills)) {
     softSkillsArr = req.body.softSkills;
   }
+
+  // التحقق من supervisor
+let supervisor = null;
+if (req.body.supervisorId) {
+  supervisor = await companySupervisorModel.findById(req.body.supervisorId);
+  
+  if (!supervisor) {
+    return next(new Error("Supervisor not found", { cause: 404 }));
+  }
+
+  if (supervisor.companyId.toString() !== company._id.toString()) {
+    return next(new Error("Supervisor does not belong to this company", { cause: 403 }));
+  }
+}
 
   const internship = await internshipModel.create({
     ...req.body,

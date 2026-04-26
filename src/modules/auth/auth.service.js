@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import collegeModel from "../../DB/models/college.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import companyModel from "../../DB/models/company.model.js";
-import company_supervisorModel from "../../DB/models/company_supervisor.model.js.js";
+import company_supervisorModel from "../../DB/models/company_supervisor.model.js";
 import academic_supervisorModel from "../../DB/models/academic_supervisor.model.js";
 
 //-------------------------- signUp ----------------------------------------------
