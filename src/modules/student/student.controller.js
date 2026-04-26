@@ -68,7 +68,9 @@ StudentRouter.put(
   US.uploadResume,
 );
 
-StudentRouter.get("/resume", auth([roles.student]), US.downloadResume);
+StudentRouter.get("/resume",
+  auth([roles.student]),
+  US.downloadResume);
 
 StudentRouter.put(
   "/avatar",

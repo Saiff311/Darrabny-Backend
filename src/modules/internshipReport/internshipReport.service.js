@@ -508,7 +508,7 @@ export const downloadReportPDF = asyncHandler(async (req, res, next) => {
   const internship = report.internshipId || {};
   const placement = internship.placement || {};
 
-  // 🔥 IMPORTANT: flat DB fields (NOT nested)
+  // IMPORTANT: flat DB fields (NOT nested)
   const technical = report.technicalSkillScore;
   const problemSolving = report.problemSolvingScore;
   const communication = report.communicationScore;

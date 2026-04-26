@@ -3,6 +3,22 @@ import userModel from "../../../DB/models/user.model.js";
 import { asyncHandler } from "../../../utils/globalErrorHandling.js";
 
 
+// ========================== Verify Company ==========================
+export const verifyCompany = asyncHandler(async (req, res, next) => {
+    const {id} = req.params 
+    const company = await companyModel.findById(id)
+    if(!company){
+        return next(new Error("Company not found", 404))
+    }
+    if(company.verificationStatus === "verified"){
+        company.verificationStatus = "rejected"
+    }else{
+        company.verificationStatus = "verified"
+    }
+    await company.save()
+    res.status(200).json({msg: `company ${company.companyName} is ${company.verificationStatus} successfully`})
+});
+
 export const banUser = asyncHandler(async (req, res, next) => {
     const {id} = req.params 
     const user = await userModel.findById(id)
@@ -31,18 +47,4 @@ export const banCompany = asyncHandler(async (req, res, next) => {
     }
     await company.save()
     res.status(200).json({msg: `company ${company.companyName} is ${company.bannedAt ? "banned" : "unbanned"} successfully`})
-});
-
-export const approveCompany = asyncHandler(async (req, res, next) => {
-    const {id} = req.params 
-    const company = await companyModel.findById(id)
-    if(!company){
-        return next(new Error("company not found", {cause:400}))
-    }
-    if(company.approvedByAdmin){
-        return next(new Error("company already approved", {cause:400}))
-    }
-    company.approvedByAdmin = true
-    await company.save()
-    res.status(200).json({msg: `company ${company.companyName} is approved successfully`})
 });

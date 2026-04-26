@@ -64,6 +64,9 @@ import path from "path";
 import { adminGraphQLSchema } from "./modules/Admin/graphql/admin.graphql.js";
 import internshipRouter from "./modules/internship/internship.controller.js";
 import internshipReportRouter from "./modules/internshipReport/internshipReport.controller.js";
+import applicationRouter from "./modules/application/applicaion.controller.js";
+import placementRouter from "./modules/placement/placement.controller.js";
+import reportRouter from "./modules/report/report.controller.js";
 
 const bootstrap = (app, express) => {
   connectDB();
@@ -80,7 +83,10 @@ const bootstrap = (app, express) => {
   app.use("/admin", adminRouter);
   app.use("/chat", chatRouter);
   app.use("/internship", internshipRouter);
-  app.use("/report", internshipReportRouter);
+  app.use("/internshipreport", internshipReportRouter);
+  app.use("/application", applicationRouter);
+  app.use("/placement", placementRouter);
+  app.use("/report", reportRouter);
 
   app.use(
     "/graphql",

@@ -14,12 +14,11 @@ const applicationSchema = new mongoose.Schema(
       ref: "user",
       required: true,
     },
-
-    resume: {
-      secure_url: String,
-      public_id: String,
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "company",
+      required: true,
     },
-
     coverLetter: {
       type: String,
       default: null,

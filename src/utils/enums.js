@@ -48,13 +48,6 @@ export const appStatus = {
 };
 Object.freeze(appStatus);
 
-export const seniorityLevels = {
-  junior: "Junior",
-  midLevel: "Mid-Level",
-  senior: "Senior",
-};
-Object.freeze(seniorityLevels);
-
 export const internshipStatus = {
   onboarding: "onboarding",
   inProgress: "in-progress",

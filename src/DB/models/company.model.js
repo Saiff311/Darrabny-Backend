@@ -72,18 +72,21 @@ const companySchema = new mongoose.Schema(
         ref: "user",
       },
     ],
-
+    verificationStatus: {
+      type: String,
+      enum: ["pending", "verified", "rejected"],
+      default: "pending",
+    },
+    validUntil: {
+      type: Date,
+      default: null,
+    },
     bannedAt: Date,
     deletedAt: Date,
 
     legalAttachment: {
       secure_url: String,
       public_id: String,
-    },
-
-    approvedByAdmin: {
-      type: Boolean,
-      default: false,
     },
   },
   {

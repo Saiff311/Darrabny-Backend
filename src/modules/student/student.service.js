@@ -168,8 +168,10 @@ export const uploadResume = asyncHandler(async (req, res, next) => {
 
   const uploadResult = await cloudinary.uploader.upload(req.file.path, {
     resource_type: "raw",
-    folder: "resumes",
-    format: "pdf",
+    // format: "pdf",
+    public_id: `resumes/${Date.now()}.pdf`, // force .pdf in the ID
+    overwrite: true,
+    access_mode: "public"  
   });
 
   student.resume = {
@@ -178,10 +180,19 @@ export const uploadResume = asyncHandler(async (req, res, next) => {
   };
   await student.save();
 
+ const downloadUrl = cloudinary.utils.private_download_url(
+  student.resume.public_id,
+  "pdf",
+  {
+    resource_type: "raw",
+    expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour expiry
+  }
+);
+
   return res.status(200).json({
     fileName: req.file.originalname,
     updatedAt: new Date().toISOString().split("T")[0],
-    downloadUrl: uploadResult.secure_url,
+    downloadUrl,
   });
 });
 
@@ -193,8 +204,14 @@ export const downloadResume = asyncHandler(async (req, res, next) => {
     return next(new Error("No resume uploaded yet", { cause: 404 }));
   }
 
+  // Transform the URL to force download with fl_attachment
+  const downloadUrl = student.resume.secure_url.replace(
+    "/upload/",
+    "/upload/fl_attachment/"
+  );
+
   return res.status(200).json({
-    downloadUrl: student.resume.secure_url,
+    downloadUrl,
   });
 });
 

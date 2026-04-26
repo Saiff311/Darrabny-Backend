@@ -21,12 +21,19 @@ const internshipReportSchema = new mongoose.Schema(
     //   required: true,
     // },
 
-    // attachments: [
-    //   {
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: "report_attachment"
-    //   }
-    // ],
+    attachments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "reportAttachment",
+      }
+    ],
+
+    comments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "reportComment",
+      },
+    ],
 
     title: {
       type: String,
