@@ -4,13 +4,12 @@ import {
   appStatus,
   internshipLocations,
   internshipStatus,
-  seniorityLevels,
   workingTimes,
 } from "../../utils/enums.js";
 
-// ========================== Add Internship Validation ==========================
+// ========================== Add Internship ==========================
 export const addInternshipSchema = Joi.object({
-  internshipTittle: Joi.string().trim().required(),
+  internshipTitle: Joi.string().trim().required(),   // ✅ internshipTitle
 
   internshipLocation: Joi.string()
     .valid(...Object.values(internshipLocations))
@@ -30,6 +29,13 @@ export const addInternshipSchema = Joi.object({
     .try(Joi.array().items(Joi.string()), Joi.string())
     .required(),
 
+<<<<<<< HEAD
+=======
+  status: Joi.string()
+    .valid(...Object.values(internshipStatus))
+    .optional(),
+
+>>>>>>> feature-StudentDashboard
   startDate: Joi.date().required(),
 
   durationInMonths: Joi.number().integer().min(1).required(),
@@ -38,10 +44,14 @@ export const addInternshipSchema = Joi.object({
 
   closed: Joi.boolean().optional(),
 
+  isFeatured: Joi.boolean().optional(),
+
   supervisorId: generalRules.id.required(),
 });
-// ========================== Update Internship Validation ==========================
+
+// ========================== Update Internship ==========================
 export const updateInternshipSchema = Joi.object({
+<<<<<<< HEAD
   internshipTittle: Joi.string().trim().optional(),
 
   internshipLocation: Joi.string()
@@ -66,9 +76,20 @@ export const updateInternshipSchema = Joi.object({
   closed: Joi.boolean().optional(),
   
   internshipId: generalRules.id.required(), 
+=======
+  internshipTitle: Joi.string().trim(),              // ✅ internshipTitle
+  internshipLocation: Joi.string().valid(...Object.values(internshipLocations)),
+  workingTime: Joi.string().valid(...Object.values(workingTimes)),
+  internshipDescription: Joi.string().trim().min(10),
+  technicalSkills: Joi.array().items(Joi.string()).min(1),
+  softSkills: Joi.array().items(Joi.string()).min(1),
+  internshipId: generalRules.id.required(),
+  closed: Joi.boolean(),
+  isFeatured: Joi.boolean(),
+>>>>>>> feature-StudentDashboard
 });
 
-// ========================== Response Application Validation ==========================
+// ========================== Response Application ==========================
 export const responseAppSchema = Joi.object({
   appId: generalRules.id.required(),
   companyId: generalRules.id.required(),
@@ -77,29 +98,29 @@ export const responseAppSchema = Joi.object({
     .required(),
 });
 
-// ========================== Get Company Internships Validation ==========================
+// ========================== Get Company Internships ==========================
 export const getCompanyInternshipsSchema = Joi.object({
   companyName: Joi.string().trim().min(3).max(50).optional(),
   page: Joi.number().min(1).default(1),
   limit: Joi.number().min(1).max(30).default(6),
   sort: Joi.string()
-    .valid("createdAt", "-createdAt", "internshipTittle", "-internshipTittle")
+    .valid("createdAt", "-createdAt", "internshipTitle", "-internshipTitle")  // ✅
     .default("-createdAt"),
 });
 
-// ========================== Internship ID Validation ==========================
+// ========================== Internship ID ==========================
 export const InternshipIdSchema = Joi.object({
   internshipId: generalRules.id.required(),
 });
 
-// ========================== Filter Internships Validation ==========================
+// ========================== Filter Internships ==========================
 export const getFilteredInternshipsSchema = Joi.object({
   page: Joi.number().min(1).default(1),
   limit: Joi.number().min(1).max(30).default(6),
   sort: Joi.string()
-    .valid("createdAt", "-createdAt", "internshipTittle", "-internshipTittle")
+    .valid("createdAt", "-createdAt", "internshipTitle", "-internshipTitle")  // ✅
     .default("-createdAt"),
-  internshipTittle: Joi.string().trim(),
+  internshipTitle: Joi.string().trim(),              // ✅
   internshipLocation: Joi.string().valid(...Object.values(internshipLocations)),
   workingTime: Joi.string().valid(...Object.values(workingTimes)),
   internshipDescription: Joi.string().trim().min(10),
@@ -108,14 +129,42 @@ export const getFilteredInternshipsSchema = Joi.object({
   closed: Joi.boolean(),
 });
 
-// ========================== Apply To Internship Validation ==========================
+// ========================== Apply To Internship ==========================
 export const ApplyToInternshipSchema = Joi.object({
   internshipId: generalRules.id.required(),
   coverLetter: Joi.string().trim().min(3).max(5000).optional().allow("", null),
   skills: Joi.alternatives()
     .try(
       Joi.array().items(Joi.string().trim().min(1)).min(1),
-      Joi.string().trim().min(1),
+      Joi.string().trim().min(1)
     )
     .optional(),
+});
+
+// ========================== LANDING: Search Preview ==========================
+export const searchPreviewSchema = Joi.object({
+  q: Joi.string().trim().min(1).max(100).required(),
+});
+
+// ========================== LISTING: Advanced Search ==========================
+export const searchInternshipsSchema = Joi.object({
+  q: Joi.string().trim().min(1).max(100).optional(),
+  internshipLocation: Joi.string()
+    .valid(...Object.values(internshipLocations))
+    .optional(),
+  workingTime: Joi.string()
+    .valid(...Object.values(workingTimes))
+    .optional(),
+  technicalSkills: Joi.string().optional(), // comma-separated: "react,node"
+  durationInMonths: Joi.number().integer().min(1).optional(),
+  page: Joi.number().min(1).default(1),
+  limit: Joi.number().min(1).max(20).default(10),
+  sort: Joi.string().optional()
+});
+
+// ========================== REVIEWS: Add Review ==========================
+export const addReviewSchema = Joi.object({
+  internshipId: generalRules.id.required(),
+  rating: Joi.number().min(1).max(5).required(),
+  comment: Joi.string().trim().max(1000).optional().allow("", null),
 });
