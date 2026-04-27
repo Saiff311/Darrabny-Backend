@@ -37,6 +37,8 @@ export const addInternshipSchema = Joi.object({
   thumbnail: Joi.string().uri().optional(),
 
   closed: Joi.boolean().optional(),
+
+  supervisorId: generalRules.id.required(),
 });
 // ========================== Update Internship Validation ==========================
 export const updateInternshipSchema = Joi.object({

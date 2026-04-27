@@ -62,3 +62,13 @@ export const internshipStatus = {
 };
 
 Object.freeze(internshipStatus);
+
+export const reportStatus = {
+  draft: "draft",
+  submitted: "submitted",
+  under_review: "under_review",
+  needs_changes: "needs_changes",
+  approved: "approved",
+};
+
+Object.freeze(reportStatus);

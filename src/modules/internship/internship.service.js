@@ -9,6 +9,7 @@ import studentModel from "../../DB/models/student.model.js";
 import { internshipStatus } from "../../utils/enums.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { analyzeApplicationWithAI } from "../../services/ai/ai.service.js";
+import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
 
 // ========================== Add Internship ==========================
 export const addInternship = asyncHandler(async (req, res, next) => {
