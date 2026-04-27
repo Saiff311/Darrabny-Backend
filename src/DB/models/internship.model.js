@@ -29,6 +29,11 @@ const internshipSchema = new mongoose.Schema(
       trim: true,
     },
 
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+
     technicalSkills: [
       {
         type: String,
@@ -77,11 +82,6 @@ const internshipSchema = new mongoose.Schema(
       type: String,
     },
 
-    // addedBy: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "user",
-    // },
-
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "user",
@@ -98,39 +98,50 @@ const internshipSchema = new mongoose.Schema(
       required: true,
     },
 
-    // supervisorId: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "company_supervisor",
-    //   required: true,
-    // },
-
     deletedAt: Date,
   },
   {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  },
+  }
 );
 
-// Indexes
+// ─── Indexes (must be BEFORE mongoose.model()) ───────────────────────────────
+
 internshipSchema.index({ endDate: 1 });
 internshipSchema.index({ companyId: 1 });
 
-// Virtual Applications
+// Text search on title + description
+internshipSchema.index({ internshipTitle: "text", internshipDescription: "text" });
+
+// Common filter combos
+internshipSchema.index({ internshipLocation: 1, workingTime: 1, durationInMonths: 1 });
+
+// Featured listing
+internshipSchema.index({ isFeatured: 1, createdAt: -1 });
+
+// ─── Virtuals ────────────────────────────────────────────────────────────────
+
 internshipSchema.virtual("Applications", {
   ref: "application",
   localField: "_id",
   foreignField: "internshipId",
 });
-// Virtual reports
+
 internshipSchema.virtual("reports", {
   ref: "internship_report",
   localField: "_id",
   foreignField: "internshipId",
 });
 
-// Cascade delete applications
+internshipSchema.virtual("postedAgo").get(function () {
+  return getTimeAgo(this.createdAt);
+});
+
+// ─── Hooks ───────────────────────────────────────────────────────────────────
+
+// Cascade delete applications when internship is deleted
 internshipSchema.pre("deleteOne", { document: true }, async function (next) {
   try {
     await applicationModel.deleteMany({ internshipId: this._id });
@@ -140,10 +151,7 @@ internshipSchema.pre("deleteOne", { document: true }, async function (next) {
   }
 });
 
-// Posted ago
-internshipSchema.virtual("postedAgo").get(function () {
-  return getTimeAgo(this.createdAt);
-});
+// ─── Model ───────────────────────────────────────────────────────────────────
 
 const internshipModel = mongoose.model("internship", internshipSchema);
 
