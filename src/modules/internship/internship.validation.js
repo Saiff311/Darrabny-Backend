@@ -30,14 +30,6 @@ export const addInternshipSchema = Joi.object({
     .try(Joi.array().items(Joi.string()), Joi.string())
     .required(),
 
-  seniorityLevel: Joi.string()
-    .valid(...Object.values(seniorityLevels))
-    .required(),
-
-  status: Joi.string()
-    .valid(...Object.values(internshipStatus))
-    .optional(),
-
   startDate: Joi.date().required(),
 
   durationInMonths: Joi.number().integer().min(1).required(),
@@ -48,14 +40,30 @@ export const addInternshipSchema = Joi.object({
 });
 // ========================== Update Internship Validation ==========================
 export const updateInternshipSchema = Joi.object({
-  internshipTittle: Joi.string().trim(),
-  internshipLocation: Joi.string().valid(...Object.values(internshipLocations)),
-  workingTime: Joi.string().valid(...Object.values(workingTimes)),
-  internshipDescription: Joi.string().trim().min(10),
-  technicalSkills: Joi.array().items(Joi.string()).min(1),
-  softSkills: Joi.array().items(Joi.string()).min(1),
-  internshipId: generalRules.id.required(),
-  closed: Joi.boolean(),
+  internshipTittle: Joi.string().trim().optional(),
+
+  internshipLocation: Joi.string()
+    .valid(...Object.values(internshipLocations))
+    .optional(),
+
+  workingTime: Joi.string()
+    .valid(...Object.values(workingTimes))
+    .optional(),
+
+  internshipDescription: Joi.string().trim().min(10).optional(),
+
+  technicalSkills: Joi.array().items(Joi.string()).min(1).optional(),
+
+  softSkills: Joi.array().items(Joi.string()).min(1).optional(),
+
+  // ✅ الحقول اللي ضفناها عشان Joi ميطردش الـ Request
+  durationInMonths: Joi.number().optional(), 
+  seniorityLevel: Joi.string().optional(),
+  startDate: Joi.date().optional(), // أو Joi.string() لو بتخزنها كنص
+
+  closed: Joi.boolean().optional(),
+  
+  internshipId: generalRules.id.required(), 
 });
 
 // ========================== Response Application Validation ==========================

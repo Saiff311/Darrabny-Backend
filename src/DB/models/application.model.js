@@ -37,6 +37,14 @@ const applicationSchema = new mongoose.Schema(
       resumeUrl: String,
     },
 
+    aiAnalysis: {
+      score: { type: Number, default: 0 },
+      label: { type: String, default: "pending" },
+      keyStrengths: [String], // مصفوفة لنقط القوة
+      areasForReview: [String], // مصفوفة لنقط الضعف
+      summary: String,
+      processedAt: { type: Date },
+    },
     // Status Timeline
     timeline: [
       {
@@ -61,7 +69,7 @@ const applicationSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 /* ======================================

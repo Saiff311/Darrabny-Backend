@@ -8,6 +8,7 @@ import userModel from "../../DB/models/user.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import { internshipStatus } from "../../utils/enums.js";
 import cloudinary from "../../utils/cloudinary.js";
+import { analyzeApplicationWithAI } from "../../services/ai/ai.service.js";
 
 // ========================== Add Internship ==========================
 export const addInternship = asyncHandler(async (req, res, next) => {
@@ -18,7 +19,9 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   }
 
   if (!company.approvedByAdmin) {
-    return next(new Error("Company is not approved by admin yet", { cause: 403 }));
+    return next(
+      new Error("Company is not approved by admin yet", { cause: 403 }),
+    );
   }
 
   if (company.deletedAt || company.bannedAt) {
@@ -57,6 +60,8 @@ export const addInternship = asyncHandler(async (req, res, next) => {
     softSkillsArr = req.body.softSkills;
   }
 
+  console.log(req.body);
+
   const internship = await internshipModel.create({
     ...req.body,
     companyId: company._id,
@@ -64,7 +69,7 @@ export const addInternship = asyncHandler(async (req, res, next) => {
     softSkills: softSkillsArr,
     thumbnail: thumbnailUrl,
   });
- 
+
   return res.status(201).json({
     success: true,
     message: "Internship added successfully",
@@ -72,14 +77,17 @@ export const addInternship = asyncHandler(async (req, res, next) => {
   });
 });
 
-
 // ========================== Get Internship By ID ==========================
 export const getInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
 
-  const internship = await internshipModel.findById({_id: internshipId, deletedAt: {$exists: false}})
+  const internship = await internshipModel.findById({
+    _id: internshipId,
+    deletedAt: { $exists: false },
+  });
 
-  if (!internship) return next(new Error("internship not found!", { cause: 404 }));
+  if (!internship)
+    return next(new Error("internship not found!", { cause: 404 }));
 
   return res.status(201).json({
     success: true,
@@ -91,10 +99,16 @@ export const getInternship = asyncHandler(async (req, res, next) => {
 // ========================== Update Internship ==========================
 export const updateInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
-
   const companyId = req.company._id;
 
   req.body.updatedBy = companyId;
+
+  // ✅ الخطوة المفقودة: إضافة رابط الصورة للـ body لو الشركة رفعت صورة جديدة
+  if (req.file) {
+    // استخدم secure_url لو بتسيف على Cloudinary
+    // أو استخدم path لو بتسيف على الفولدر المحلي (uploads)
+    req.body.thumbnail = req.file.secure_url || req.file.path;
+  }
 
   const internship = await internshipModel.findOneAndUpdate(
     { _id: internshipId, companyId },
@@ -125,7 +139,9 @@ export const deleteInternship = asyncHandler(async (req, res, next) => {
 
   if (internship.companyId.toString() !== companyId.toString()) {
     return next(
-      new Error("You are not authorized to delete this internship", { cause: 403 })
+      new Error("You are not authorized to delete this internship", {
+        cause: 403,
+      }),
     );
   }
 
@@ -194,25 +210,25 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
     .findById(req.user._id)
     .select("savedInternships");
   const savedInternshipsIds = user?.savedInternships || [];
-//view internship details
-// export const getInternshipById = asyncHandler(async (req, res, next) => {
-//   const { internshipId } = req.params;
-//   //check saved internships by user
-//   const user = await userModel
-//     .findById(req.user._id)
-//     .select("savedInternships");
-//   const savedInternshipsIds = user?.savedInternships || [];
+  //view internship details
+  // export const getInternshipById = asyncHandler(async (req, res, next) => {
+  //   const { internshipId } = req.params;
+  //   //check saved internships by user
+  //   const user = await userModel
+  //     .findById(req.user._id)
+  //     .select("savedInternships");
+  //   const savedInternshipsIds = user?.savedInternships || [];
 
-// await internshipModel.aggregate([
-//   {
-//     $match: { _id: new mongoose.Types.ObjectId(internshipId) }
-//   },
-//   {
-//     $addFields: {
-//       isSaved: { $in: ["$_id", savedInternshipsIds] }
-//     }
-//   }
-// ])
+  // await internshipModel.aggregate([
+  //   {
+  //     $match: { _id: new mongoose.Types.ObjectId(internshipId) }
+  //   },
+  //   {
+  //     $addFields: {
+  //       isSaved: { $in: ["$_id", savedInternshipsIds] }
+  //     }
+  //   }
+  // ])
 
   if (!internship) {
     return next(new Error("internship not found", { cause: 404 }));
@@ -290,83 +306,25 @@ export const getFilteredInternships = asyncHandler(async (req, res, next) => {
   });
 });
 
-// ========================== Get Internship Applications ==========================
-export const getInternshipApp = asyncHandler(async (req, res, next) => {
-  const { internshipId } = req.params;
-  const { page = 1, limit = 5, sort = "-createdAt" } = req.query;
-  const skip = (page - 1) * limit;
-
-  let internship = await internshipModel.findById(internshipId);
-
-  if (!internship) {
-    return next(new Error("internship not found", { cause: 404 }));
-  }
-
-  const company = await companyModel.findById(internship.companyId);
-
-  if (!company) {
-    return next(new Error("Company not found", { cause: 404 }));
-  }
-
-  // Authorization check
-  if (
-    company.createdBy.toString() !== req.user._id.toString() &&
-    !company.HRs.includes(req.user._id)
-  ) {
-    return next(
-      new Error("You are not authorized to perform this action", {
-        cause: 403,
-      }),
-    );
-  }
-
-  internship = internship.populate([
-    {
-      path: "application",
-      options: { sort, skip, limit },
-      populate: {
-        path: "userId",
-        select: "username email",
-      },
-    },
-  ]);
-
-  const totalCount = await applicationModel.countDocuments({
-    internshipId: internship._id,
-  });
-
-  if (internship.application.length === 0) {
-    return next(new Error("No applications found", { cause: 404 }));
-  }
-
-  return res.status(200).json({
-    success: true,
-    message: "Applications fetched successfully",
-    data: internship,
-    pagination: {
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-    },
-  });
-});
-
 // ========================== Apply To Internship ==========================
 export const ApplyToInternship = asyncHandler(async (req, res, next) => {
   const internshipId = req.params.id || req.params.internshipId;
   const { coverLetter, skills } = req.body;
 
+  // 1. جلب بيانات التدريب والتأكد من وجوده
   const internship = await internshipModel
     .findById(internshipId)
-    .select("status closed addedBy title");
+    .select(
+      "status closed companyId internshipTittle technicalSkills internshipDescription",
+    );
 
   if (!internship) {
     return next(new Error("internship not found", { cause: 404 }));
   }
 
-  // Check internship availability
+  // 2. التحقق من حالة التدريب
   const isOpen = internship.status
-    ? ["active", "starting_soon"].includes(internship.status)
+    ? ["onboarding","active", "starting_soon"].includes(internship.status)
     : !internship.closed;
 
   if (!isOpen) {
@@ -375,7 +333,7 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // Prevent duplicate applications
+  // 3. منع التقديم المتكرر
   const alreadyApplied = await applicationModel.exists({
     internshipId,
     userId: req.user._id,
@@ -387,32 +345,35 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // Get student data
+  // 4. جلب بيانات الطالب (البروفايل والمشاريع)
   const student = await studentModel
     .findOne({ userId: req.user._id })
-    .select("fullName email university skills resume");
+    .select("university projects resume skills");
 
   if (!student) {
-    return next(new Error("student not found", { cause: 404 }));
+    return next(new Error("student profile not found", { cause: 404 }));
   }
 
-  // CV is required
-  if (!student.resume?.secure_url || !student.resume?.public_id) {
-    return next(
-      new Error("resume is required. please upload resume first", {
-        cause: 400,
-      }),
-    );
+  // 5. التحقق من السيرة الذاتية
+  if (!student.resume?.secure_url) {
+    return next(new Error("resume is required", { cause: 400 }));
   }
 
-  // Prepare skills array
+  // 6. تجهيز مصفوفة المهارات (Skills) مع دعم form-data
   let skillsArr = [];
   if (Array.isArray(skills)) {
-    skillsArr = skills;
+    skillsArr = skills.map((s) => String(s).trim()).filter(Boolean);
   } else if (typeof skills === "string" && skills.trim()) {
     try {
       const parsed = JSON.parse(skills);
-      skillsArr = Array.isArray(parsed) ? parsed : [];
+      if (Array.isArray(parsed)) {
+        skillsArr = parsed.map((s) => String(s).trim()).filter(Boolean);
+      } else {
+        skillsArr = skills
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
     } catch {
       skillsArr = skills
         .split(",")
@@ -420,42 +381,69 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
         .filter(Boolean);
     }
   } else {
-    skillsArr = Array.isArray(student.skills) ? student.skills : [];
+    skillsArr = Array.isArray(student.skills)
+      ? student.skills.map((s) => String(s).trim()).filter(Boolean)
+      : [];
   }
 
-  // Create application snapshot
+  // 7. إنشاء طلب التقديم (Application)
   try {
     const application = await applicationModel.create({
       internshipId,
       userId: req.user._id,
       companyId: internship.companyId,
-      status: "pending",
       coverLetter: coverLetter?.trim() || null,
       skills: skillsArr,
-      resume: {
-        secure_url: student.resume.secure_url,
-        public_id: student.resume.public_id,
-      },
       snapshot: {
-        studentName: student.fullName,
-        email: student.email,
+        studentName: `${req.user.firstName} ${req.user.lastName}`,
+        email: req.user.email,
         university: student.university,
         skills: skillsArr,
         resumeUrl: student.resume.secure_url,
       },
     });
 
+    // 🚀 تشغيل الـ AI Analysis في الخلفية (Background Task)
+    analyzeApplicationWithAI(
+      {
+        skills: skillsArr,
+        bio: req.user.bio || "",
+        projects: student.projects || [],
+        university: student.university,
+      },
+      {
+        internshipTittle: internship.internshipTittle,
+        technicalSkills: internship.technicalSkills,
+        internshipDescription: internship.internshipDescription,
+      },
+    )
+      .then(async (aiResult) => {
+        // تحديث الـ Database بالتحليل التفصيلي (Strengths & Areas for review)
+        await applicationModel.findByIdAndUpdate(application._id, {
+          "aiAnalysis.score": aiResult.score,
+          "aiAnalysis.label": aiResult.label,
+          "aiAnalysis.keyStrengths": aiResult.keyStrengths, // مصفوفة نقط القوة
+          "aiAnalysis.areasForReview": aiResult.areasForReview, // مصفوفة التحذيرات
+          "aiAnalysis.summary": aiResult.summary, // الملخص
+          "aiAnalysis.processedAt": new Date(),
+        });
+        console.log(
+          `✅ AI Detailed Ranking completed for application: ${application._id}`,
+        );
+      })
+      .catch((err) => {
+        console.error("❌ AI Analysis background error:", err);
+      });
+
+    // 8. الرد السريع على الطالب
     return res.status(201).json({
-      message: "Application submitted successfully",
+      success: true,
+      message: "Application submitted. AI is analyzing your profile now.",
       applicationId: application._id,
     });
   } catch (err) {
     if (err?.code === 11000) {
-      return next(
-        new Error("You have already applied for this internship", {
-          cause: 409,
-        }),
-      );
+      return next(new Error("Duplicate application detected", { cause: 409 }));
     }
     throw err;
   }
@@ -484,12 +472,17 @@ export const responseApp = asyncHandler(async (req, res, next) => {
     },
   ]);
 
-  // Authorization check
-  if (
-    application.internshipId.companyId.createdBy.toString() !==
-      req.user._id.toString() &&
-    !application.internshipId.companyId.HRs.includes(req.user._id)
-  ) {
+  // Authorization check (guard against missing company owner/HRs fields)
+  const requesterId = String(req.user?._id || "");
+  const companyData = application?.internshipId?.companyId;
+  const ownerId = companyData?.createdBy ? String(companyData.createdBy) : null;
+  const hrIds = Array.isArray(companyData?.HRs)
+    ? companyData.HRs.map((id) => String(id))
+    : [];
+  const isAuthorized =
+    (ownerId && ownerId === requesterId) || hrIds.includes(requesterId);
+
+  if (!isAuthorized) {
     return next(
       new Error("You are not authorized to perform this action", {
         cause: 403,
@@ -554,7 +547,7 @@ export const getStudentInternships = asyncHandler(async (req, res, next) => {
     const totalWeeks = Math.ceil((end - start) / msPerDay / 7);
     const currentWeek = Math.min(
       Math.ceil((today - start) / msPerDay / 7),
-      totalWeeks
+      totalWeeks,
     );
     const progress = Math.round((currentWeek / totalWeeks) * 100);
 

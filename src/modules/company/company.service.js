@@ -255,13 +255,13 @@ export const companySignup = asyncHandler(async (req, res, next) => {
     return next(
       new Error("Company email, phone, or name already exists!", {
         cause: 409,
-      })
+      }),
     );
   }
 
   delete req.body.confirmPassword;
   console.log(req.body);
-  
+
   const newCompany = await companyModel.create({
     companyName,
     email,
@@ -312,14 +312,19 @@ export const companyLogin = asyncHandler(async (req, res, next) => {
 export const getCompanyApplications = asyncHandler(async (req, res, next) => {
   const companyId = req.company;
 
-  const { status = "pending", page = 1, limit = 10, sort = "newest" } = req.query;
+  const {
+    status = "pending",
+    page = 1,
+    limit = 10,
+    sort = "newest",
+  } = req.query;
 
   // Get company internships
   const internships = await internshipModel
     .find({ companyId })
     .select("_id internshipTittle");
 
-  const internshipIds = internships.map(i => i._id);
+  const internshipIds = internships.map((i) => i._id);
 
   const filter = { internshipId: { $in: internshipIds } };
 
@@ -327,10 +332,7 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
     filter.status = status;
   }
 
-  const sortOption =
-    sort === "newest"
-      ? { createdAt: -1 }
-      : { createdAt: -1 };
+  const sortOption = sort === "newest" ? { createdAt: -1 } : { createdAt: -1 };
 
   const skip = (Number(page) - 1) * Number(limit);
 
@@ -345,21 +347,21 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
   const totalItems = await applicationModel.countDocuments(filter);
   const totalPages = Math.ceil(totalItems / limit);
 
-  const data = applications.map(app => ({
+  const data = applications.map((app) => ({
     applicationId: app._id,
     internship: {
       id: app.internshipId?._id,
-      title: app.internshipId?.internshipTittle
+      title: app.internshipId?.internshipTittle,
     },
     student: {
       id: app.userId?._id,
       fullName: app.userId?.fullName,
       email: app.userId?.email,
-      university: app.userId?.university
+      university: app.userId?.university,
     },
     skills: app.skills,
     status: app.status,
-    appliedAt: app.createdAt
+    appliedAt: app.createdAt,
   }));
 
   res.status(200).json({
@@ -368,25 +370,24 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
       page: Number(page),
       limit: Number(limit),
       totalItems,
-      totalPages
-    }
+      totalPages,
+    },
   });
 });
 
-
 // ========================== Display Company Verification ==========================
 export const companyVerification = asyncHandler(async (req, res, next) => {
-    const companyId = req.company
-    const company = await companyModel.findById(companyId)
+  const companyId = req.company;
+  const company = await companyModel.findById(companyId);
   return res.status(200).json({
     msg: "Verification details retrieved",
     status: company.verificationStatus,
-    validUntil: company.validUntil });
+    validUntil: company.validUntil,
+  });
 });
 
 // ========================= Company Dashboard ==========================
 export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
-
   const companyId = req.company._id;
 
   let stats = {
@@ -407,32 +408,30 @@ export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
     validUntil: null,
   };
 
-    // total applicants
-    const totalApplicants = await applicationModel.countDocuments({
-      company: companyId,
-    });
-    stats.totalApplicants = totalApplicants;
+  // total applicants
+  const totalApplicants = await applicationModel.countDocuments({
+    company: companyId,
+  });
+  stats.totalApplicants = totalApplicants;
 
-    // active internships
-    const internships = await internshipModel.countDocuments({
-      company: companyId,
-      status: "inProgress",
-    });
+  // active internships
+  const internships = await internshipModel.countDocuments({
+    company: companyId,
+    status: "inProgress",
+  });
 
-    stats.activePostings.internships = internships;
-    stats.activePostings.total = internships;
+  stats.activePostings.internships = internships;
+  stats.activePostings.total = internships;
 
-    // completed trainees
-    const completed = await internshipAssignmentModel.countDocuments({
-      company: companyId,
-      status: "completed",
-    });
+  // completed trainees
+  const completed = await internshipAssignmentModel.countDocuments({
+    company: companyId,
+    status: "completed",
+  });
 
-    stats.totalCompletedTrainees = completed;
-
+  stats.totalCompletedTrainees = completed;
 
   try {
-
     // ongoing interns preview
     ongoingInternships = await internshipAssignmentModel
       .find({
@@ -442,27 +441,152 @@ export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
       .limit(3)
       .populate("student", "name")
       .populate("internship", "title");
-
   } catch (err) {
     ongoingInternships = [];
   }
 
+  const company = await companyModel
+    .findById(companyId)
+    .select("verificationStatus");
 
-    const company = await companyModel
-      .findById(companyId)
-      .select("verificationStatus");
-
-    if (company) {
-      verification = {
-        status: company.verificationStatus || "pending"
-      };
-    }
+  if (company) {
+    verification = {
+      status: company.verificationStatus || "pending",
+    };
+  }
 
   return res.status(200).json({
     stats,
     ongoingInternships,
     verification,
   });
-
 });
 
+// ========================= Get Company Settings ==========================
+export const getCompanySettings = asyncHandler(async (req, res, next) => {
+  const companyId = req.company?._id;
+
+  if (!companyId) {
+    return next(new Error("Company authentication required", { cause: 401 }));
+  }
+
+  const company = await companyModel
+    .findById(companyId)
+    .select("companyName email companyPhone address notifications");
+
+  if (!company) {
+    return next(new Error("Company not found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: company,
+  });
+});
+
+// ========================= Update Company Settings ==========================
+export const updateCompanySettings = asyncHandler(async (req, res, next) => {
+  const companyId = req.company?._id;
+  const { companyName, email, companyPhone, address } = req.body;
+
+  if (!companyId) {
+    return next(new Error("Company authentication required", { cause: 401 }));
+  }
+
+  const currentCompany = await companyModel.findById(companyId);
+  if (!currentCompany) {
+    return next(new Error("Company not found", { cause: 404 }));
+  }
+
+  if (currentCompany.deletedAt || currentCompany.bannedAt) {
+    return next(new Error("Company is deleted or banned", { cause: 403 }));
+  }
+
+  if (email && email !== currentCompany.email) {
+    const emailExists = await companyModel.findOne({
+      email,
+      _id: { $ne: companyId },
+    });
+    if (emailExists) {
+      return next(new Error("Email already exists", { cause: 409 }));
+    }
+  }
+
+  if (companyPhone && companyPhone !== currentCompany.companyPhone) {
+    const phoneExists = await companyModel.findOne({
+      companyPhone,
+      _id: { $ne: companyId },
+    });
+    if (phoneExists) {
+      return next(new Error("Phone number already exists", { cause: 409 }));
+    }
+  }
+
+  if (companyName && companyName !== currentCompany.companyName) {
+    const nameExists = await companyModel.findOne({
+      companyName,
+      _id: { $ne: companyId },
+    });
+    if (nameExists) {
+      return next(new Error("Company name already exists", { cause: 409 }));
+    }
+  }
+
+  const updates = {};
+  if (companyName !== undefined) updates.companyName = companyName;
+  if (email !== undefined) updates.email = email;
+  if (companyPhone !== undefined) updates.companyPhone = companyPhone;
+  if (address !== undefined) updates.address = address;
+
+  const updatedCompany = await companyModel.findByIdAndUpdate(
+    companyId,
+    updates,
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: "Company settings updated successfully",
+    data: updatedCompany,
+  });
+});
+
+// ========================= Update Notification Preferences ==========================
+export const updateNotificationPreferences = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company?._id;
+    const { email, push } = req.body;
+
+    if (!companyId) {
+      return next(new Error("Company authentication required", { cause: 401 }));
+    }
+
+    const updates = {};
+    if (email !== undefined) updates["notifications.email"] = email;
+    if (push !== undefined) updates["notifications.push"] = push;
+
+    const updatedCompany = await companyModel
+      .findByIdAndUpdate(
+        companyId,
+        { $set: updates },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .select("companyName notifications");
+
+    if (!updatedCompany) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification preferences updated successfully",
+      data: updatedCompany,
+    });
+  },
+);

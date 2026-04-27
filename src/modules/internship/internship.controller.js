@@ -18,13 +18,6 @@ internshipRouter.post(
 );
 
 
-// Update internship
-internshipRouter.patch(
-  "/:internshipId",
-  validation(JV.updateInternshipSchema),
-  auth(Object.values(roles)),
-  JS.updateInternship,
-);
 
 internshipRouter.get("/my",
     auth([roles.student]),
@@ -32,11 +25,29 @@ internshipRouter.get("/my",
 )
 
 // Update internship
-internshipRouter.patch("/:internshipId",
-    validation(JV.updateInternshipSchema),
-    auth([roles.company, roles.admin]),
-    JS.updateInternship
-)
+internshipRouter.patch(
+  "/:internshipId",
+  auth([roles.company, roles.admin]),
+  hostMulter(fileTypes.image).single("thumbnail"),
+
+  // ✅ الميدلوير ده بيحول النصوص للأنواع الصح عشان الـ Validation يرضى عنها
+  (req, res, next) => {
+    // تحويل الـ durationInMonths لرقم (لو مبعوت)
+    if (req.body.durationInMonths) {
+      req.body.durationInMonths = Number(req.body.durationInMonths);
+    }
+
+    // تحويل الـ closed لـ Boolean (لو مبعوت)
+    if (req.body.closed !== undefined) {
+      req.body.closed = req.body.closed === 'true';
+    }
+
+    next();
+  },
+
+  validation(JV.updateInternshipSchema),
+  JS.updateInternship
+);
 
 // Delete internship
 internshipRouter.delete(
@@ -71,20 +82,12 @@ internshipRouter.get(
   JS.getFilteredInternships,
 );
 
-// Get internship applications
-internshipRouter.get(
-  "/internshipApp",
-  validation(JV.InternshipIdSchema),
-  auth(Object.values(roles)),
-  JS.getInternshipApp,
-);
-
 // Apply to internship (with CV upload)
 internshipRouter.post(
   "/ApplyToInternship/:internshipId",
+  auth([roles.student]),
+  hostMulter(fileTypes.pdf).single("resume"),
   validation(JV.ApplyToInternshipSchema),
-  auth(Object.values(roles)),
-  hostMulter(fileTypes.image).single("userCV"),
   JS.ApplyToInternship,
 );
 

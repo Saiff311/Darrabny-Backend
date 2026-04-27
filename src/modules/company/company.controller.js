@@ -121,4 +121,28 @@ companyRouter.get(
   CS.getCompanyDashboard
 );
 
+// ------------------ Company Settings ------------------
+companyRouter.get(
+  "/settings",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.getCompanySettings,
+);
+
+// ------------------ Update Company Settings ------------------
+companyRouter.patch(
+  "/settings",
+  auth([roles.company]),
+  validation(CV.updateCompanySettingsSchema),
+  CS.updateCompanySettings,
+);
+
+// ------------------ Update Company Notification Preferences ------------------
+companyRouter.patch(
+  "/settings/notifications",
+  auth([roles.company]),
+  validation(CV.updateNotificationPreferencesSchema),
+  CS.updateNotificationPreferences,
+);
+
 export default companyRouter;

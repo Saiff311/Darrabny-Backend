@@ -10,17 +10,17 @@ const placementSchema = new mongoose.Schema(
 
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "student", 
+      ref: "student",
       required: true,
     },
 
     supervisorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "academic_supervisor",
-      required:false,
+      required: false,
     },
 
-   companyId: {
+    companyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "company",
       required: true,
@@ -42,10 +42,34 @@ const placementSchema = new mongoose.Schema(
       enum: ["pending", "ongoing", "completed", "cancelled"],
       default: "pending",
     },
+
+    finalEvaluation: {
+      type: String,
+      enum: ["excellent", "very good", "good", "acceptable", "poor"],
+    },
+
+    industry: {
+      type: String,
+      trim: true,
+    },
+
+    majorSnapshot: {
+      type: String,
+      trim: true,
+    },
+
+    certificateUrl: {
+      type: String,
+      trim: true,
+    },
+
+    completionDate: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export const placementModel = mongoose.model("placement", placementSchema);

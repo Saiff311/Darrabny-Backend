@@ -39,12 +39,19 @@ export const workingTimes = {
 };
 Object.freeze(workingTimes);
 
+export const seniorityLevels = {
+  junior: "junior",
+  mid: "mid",
+  senior: "senior",
+};
+
 export const appStatus = {
   pending: "pending",
   accepted: "accepted",
   viewed: "viewed",
   inconsideration: "inconsideration",
   rejected: "rejected",
+  completed: "completed",
 };
 Object.freeze(appStatus);
 

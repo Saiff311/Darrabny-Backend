@@ -88,6 +88,17 @@ const companySchema = new mongoose.Schema(
       secure_url: String,
       public_id: String,
     },
+
+    notifications: {
+      email: {
+        type: Boolean,
+        default: true,
+      },
+      push: {
+        type: Boolean,
+        default: true,
+      },
+    },
   },
   {
     timestamps: true,

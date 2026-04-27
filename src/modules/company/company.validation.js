@@ -139,3 +139,24 @@ export const getCompanyApplicationsSchema = joi.object({
 // ------------------ emptySchema ------------------
 export const emptySchema = joi.object().length(0);
 
+// ------------------ Company Settings ------------------
+export const updateCompanySettingsSchema = joi
+  .object({
+    companyName: joi.string().trim().min(2).max(60).optional(),
+    email: generalRules.email.optional(),
+    companyPhone: joi
+      .string()
+      .trim()
+      .pattern(/^[0-9+\-\s]{7,20}$/)
+      .optional(),
+    address: joi.string().trim().min(3).max(255).optional(),
+  })
+  .or("companyName", "email", "companyPhone", "address");
+
+export const updateNotificationPreferencesSchema = joi
+  .object({
+    email: joi.boolean().optional(),
+    push: joi.boolean().optional(),
+  })
+  .or("email", "push");
+

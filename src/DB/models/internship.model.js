@@ -1,11 +1,15 @@
 import mongoose from "mongoose";
-import { internshipLocations, internshipStatus, workingTimes } from "../../utils/enums.js";
+import {
+  internshipLocations,
+  internshipStatus,
+  workingTimes,
+} from "../../utils/enums.js";
 import applicationModel from "./application.model.js";
 import { getTimeAgo } from "../../utils/local-functions/timeAgo.js";
 
 const internshipSchema = new mongoose.Schema(
   {
-    internshipTitle: {
+    internshipTittle: {
       type: String,
       required: true,
       trim: true,
@@ -77,11 +81,6 @@ const internshipSchema = new mongoose.Schema(
       type: String,
     },
 
-    // addedBy: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "user",
-    // },
-
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "user",
@@ -104,21 +103,43 @@ const internshipSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  },
+  }
 );
 
-// Indexes
+/* =========================
+   AUTO CALCULATE endDate
+========================= */
+internshipSchema.pre("validate", function (next) {
+  if (this.startDate && this.durationInMonths) {
+    const start = new Date(this.startDate);
+
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + this.durationInMonths);
+
+    this.endDate = end;
+  }
+
+  next();
+});
+
+/* =========================
+   INDEXES
+========================= */
 internshipSchema.index({ endDate: 1 });
 internshipSchema.index({ companyId: 1 });
 
-// Virtual Applications
+/* =========================
+   VIRTUAL: APPLICATIONS
+========================= */
 internshipSchema.virtual("Applications", {
   ref: "application",
   localField: "_id",
   foreignField: "internshipId",
 });
 
-// Cascade delete applications
+/* =========================
+   CASCADE DELETE
+========================= */
 internshipSchema.pre("deleteOne", { document: true }, async function (next) {
   try {
     await applicationModel.deleteMany({ internshipId: this._id });
@@ -128,7 +149,9 @@ internshipSchema.pre("deleteOne", { document: true }, async function (next) {
   }
 });
 
-// Posted ago
+/* =========================
+   POSTED AGO
+========================= */
 internshipSchema.virtual("postedAgo").get(function () {
   return getTimeAgo(this.createdAt);
 });

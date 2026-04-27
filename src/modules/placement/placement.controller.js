@@ -6,19 +6,35 @@ import { auth } from "../../middleware/auth.js";
 import { roles } from "../../utils/enums.js";
 
 const placementRouter = Router();
-// ------------------get progress------------------ 
+
+// ------------------company completed analytics------------------
 placementRouter.get(
-    "/:id/progress",
-    auth(Object.values(roles)),
-    validation(PV.placementIdSchema),
-    PS.getPlacementProgress
-)
+  "/analytics/completed",
+  auth([roles.company]),
+  PS.getCompanyCompletedInternshipsAnalytics,
+);
+
+// ------------------get progress------------------
+placementRouter.get(
+  "/:id/progress",
+  auth(Object.values(roles)),
+  validation(PV.placementIdSchema),
+  PS.getPlacementProgress,
+);
 // ------------------get details------------------
 placementRouter.get(
-    "/:id",
-    auth(Object.values(roles)),
-    validation(PV.placementIdSchema),
-    PS.getPlacementDetails
-)
+  "/:id",
+  auth(Object.values(roles)),
+  validation(PV.placementIdSchema),
+  PS.getPlacementDetails,
+);
 
-export default placementRouter
+// ------------------complete placement------------------
+placementRouter.patch(
+  "/:id/complete",
+  auth([roles.company]),
+  validation(PV.completePlacementSchema),
+  PS.completePlacement,
+);
+
+export default placementRouter;
