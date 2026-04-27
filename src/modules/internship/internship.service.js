@@ -700,7 +700,7 @@ export const getStudentInternships = asyncHandler(async (req, res, next) => {
 
     return {
       id: internship._id,
-      title: internship.internshipTitle,   // ✅ fixed
+      title: internship.internshipTitle, 
       company: {
         id: internship.companyId._id,
         name: internship.companyId.companyName,
