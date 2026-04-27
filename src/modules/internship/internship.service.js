@@ -11,8 +11,8 @@ import { escapeRegex } from "../../utils/security/escapeRegax.js";
 import { internshipStatus, roles } from "../../utils/enums.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { analyzeApplicationWithAI } from "../../services/ai/ai.service.js";
-
 import mongoose from "mongoose";
+
 // ========================== Add Internship ==========================
 export const addInternship = asyncHandler(async (req, res, next) => {
   const company = req.company;
@@ -258,7 +258,48 @@ export const searchPreview = asyncHandler(async (req, res) => {
   res.json({ success: true, data: results });
 });
 
+// ========================== get Filter Internships ==========================
+export const getFilteredInternships = asyncHandler(async (req, res, next) => {
+  const { page = 1, limit = 6, sort = "-createdAt", ...filters } = req.query;
+  const skip = (page - 1) * limit;
 
+  // Get saved internships for user
+  const user = await userModel
+    .findById(req.user._id)
+    .select("savedInternships");
+  const savedInternshipsIds = user?.savedInternships || [];
+
+  const internships = await internshipModel
+    .find(filters)
+    .sort(sort)
+    .skip(skip)
+    .limit(limit)
+    .populate("companyId", "companyName")
+    .aggregate([
+      {
+        $addFields: {
+          isSaved: { $in: ["$_id", savedInternshipsIds] },
+        },
+      },
+    ]);
+
+  const totalCount = await internshipModel.countDocuments(filters);
+
+  if (internships.length === 0) {
+    return next(new Error("No internships found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "internships fetched successfully",
+    data: internships,
+    pagination: {
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+    },
+  });
+});
 // ========================== LANDING: Featured Internships ==========================
 export const getFeaturedInternships = asyncHandler(async (req, res, next) => {
   const internships = await internshipModel
@@ -772,7 +813,7 @@ export const getStudentInternships = asyncHandler(async (req, res, next) => {
 
     return {
       id: internship._id,
-      title: internship.internshipTitle, 
+      title: internship.internshipTitle,
       company: {
         id: internship.companyId._id,
         name: internship.companyId.companyName,

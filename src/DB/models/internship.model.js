@@ -130,11 +130,8 @@ internshipSchema.pre("validate", function (next) {
 /* =========================
    INDEXES
 ========================= */
-internshipSchema.index({ endDate: 1 });
-internshipSchema.index({ companyId: 1 });
-
 /* =========================
-   VIRTUAL: APPLICATIONS
+  VIRTUAL: APPLICATIONS
 ========================= */
 // ─── Indexes (must be BEFORE mongoose.model()) ───────────────────────────────
 
