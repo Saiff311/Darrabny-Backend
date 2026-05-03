@@ -5,7 +5,47 @@ import applicationModel from "../../DB/models/application.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import mongoose from "mongoose";
 
+// ========================== Get Internship Students ==========================
+export const getInternshipStudents = asyncHandler(async (req, res, next) => {
+  const { internshipId } = req.params;
 
+  const placements = await placementModel
+    .find({ internshipId, status: "ongoing" })
+    .select("_id currentPerformance studentId")
+    .populate({
+      path: "studentId",
+      select: "major university",
+      populate: {
+        path: "userId",
+        select: "firstName lastName email profilePic address",
+      },
+    })
+    .lean();
+
+  if (!placements.length) {
+    return res.status(200).json({
+      success: true,
+      message: "No ongoing placements found for this internship",
+      data: [],
+    });
+  }
+
+  const students = placements.map((placement) => ({
+    placementId: placement._id,
+    currentPerformance: placement.currentPerformance || 0,
+    fullName: `${placement.studentId.userId.firstName} ${placement.studentId.userId.lastName}`,
+    email: placement.studentId.userId.email,
+    avatar: placement.studentId.userId.profilePic?.secure_url || null,
+    university: placement.studentId.university || null,
+    major: placement.studentId.major || null,
+  }));
+
+  return res.status(200).json({
+    success: true,
+    message: "Internship students fetched successfully",
+    data: students,
+  });
+});
 
  export const getPlacementProgress = asyncHandler(async (req, res) => {
   const placement = await placementModel.findById(req.params.id);

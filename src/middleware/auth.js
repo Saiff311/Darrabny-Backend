@@ -2,6 +2,8 @@ import jwt from "jsonwebtoken";
 import userModel from "../DB/models/user.model.js";
 import { asyncHandler } from "../utils/globalErrorHandling.js";
 import companyModel from "../DB/models/company.model.js";
+import collegeModel from "../DB/models/college.model.js";
+import { roles } from "../utils/enums.js";
 
 export const auth = (allowedTypes = []) => {
   return asyncHandler(async (req, res, next) => {
@@ -34,6 +36,10 @@ export const auth = (allowedTypes = []) => {
       secretKey = process.env.COMPANY_SECRET_KEY;
       model = companyModel;
       entityType = "company";
+    } else if (bearer === process.env.COLLEGE_BEARER) {
+      secretKey = process.env.COLLEGE_SECRET_KEY;
+      model = collegeModel;
+      entityType = "college";
     } else {
       return next(new Error("Invalid bearer!", { cause: 400 }));
     }
@@ -85,6 +91,22 @@ export const auth = (allowedTypes = []) => {
         }
 
         req.company = authEntity;
+      }
+
+      if (entityType === "college") {
+        if (allowedTypes.length && !allowedTypes.includes(roles.college)) {
+          return next(
+            new Error("College not allowed to access this endpoint", {
+              cause: 403,
+            }),
+          );
+        }
+
+        if (authEntity.bannedAt) {
+          return next(new Error("College is banned", { cause: 403 }));
+        }
+
+        req.college = authEntity;
       }
 
       next();

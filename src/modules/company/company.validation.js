@@ -122,6 +122,12 @@ export const companyLoginSchema = joi.object({
   password: joi.string().required(),
 });
 
+
+export const sendEndorsementRequestSchema = joi.object({
+  internshipId: generalRules.id.required(),
+  universityId: generalRules.id.required(),
+});
+
 export const getCompanyApplicationsSchema = joi.object({
   status: joi
     .string()

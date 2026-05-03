@@ -1,6 +1,8 @@
 import applicationModel from "../../DB/models/application.model.js";
 import companyModel from "../../DB/models/company.model.js";
 import internshipModel from "../../DB/models/internship.model.js";
+import collegeModel from "../../DB/models/college.model.js";
+import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import { internshipAssignmentModel } from "../../DB/models/InternshipAssignment.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { roles } from "../../utils/enums.js";
@@ -307,6 +309,69 @@ export const companyLogin = asyncHandler(async (req, res, next) => {
 
   return res.status(200).json({ msg: "Login successful", company, token });
 });
+
+
+
+// ========================== Send Endorsement Request ==========================
+export const sendEndorsementRequest = asyncHandler(async (req, res, next) => {
+  const companyId = req.company?._id;
+  const { internshipId, universityId } = req.body;
+
+  if (!companyId) {
+    return next(new Error("Company authentication required", { cause: 401 }));
+  }
+
+  const internship = await internshipModel.findOne({
+    _id: internshipId,
+    companyId,
+    deletedAt: { $exists: false },
+  });
+
+  if (!internship) {
+    return next(
+      new Error("Internship not found or not owned by this company", {
+        cause: 404,
+      }),
+    );
+  }
+
+  const university = await collegeModel.findOne({
+    _id: universityId,
+    deletedAt: { $exists: false },
+  });
+
+  if (!university) {
+    return next(new Error("University not found", { cause: 404 }));
+  }
+
+  const existingRequest = await internshipApprovalModel.findOne({
+    internshipId,
+    universityId,
+  });
+
+  if (existingRequest) {
+    return next(
+      new Error("Endorsement request already exists for this internship and university", {
+        cause: 409,
+      }),
+    );
+  }
+
+  const approval = await internshipApprovalModel.create({
+    internshipId,
+    companyId,
+    universityId,
+    status: "pending",
+  });
+
+  return res.status(201).json({
+    success: true,
+    message: "Endorsement request sent successfully",
+    data: approval,
+  });
+});
+
+
 
 // ========================== Get Company Applications ==========================
 export const getCompanyApplications = asyncHandler(async (req, res, next) => {

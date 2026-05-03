@@ -101,7 +101,7 @@ internshipRouter.delete(
 internshipRouter.get(
   "/companyInternships",
   validation(JV.getCompanyInternshipsSchema),
-  auth(Object.values(roles)),
+  auth([roles.company]),
   JS.getCompanyInternships
 );
 
@@ -157,6 +157,14 @@ internshipRouter.get(
   validation(JV.InternshipIdSchema),
   auth(Object.values(roles)),
   JS.getInternshipById
+);
+
+// GET /api/internship/:internshipId/students (ongoing students with performance)
+internshipRouter.get(
+  "/:internshipId/students",
+  validation(JV.InternshipIdSchema),
+  auth([roles.company]),
+  JS.getInternshipStudents
 );
 
 // GET /api/internship/:internshipId/reviews

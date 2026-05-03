@@ -7,6 +7,14 @@ import { roles } from "../../utils/enums.js";
 
 const placementRouter = Router();
 
+// ------------------get internship students------------------
+placementRouter.get(
+  "/internship/:internshipId/students",
+  auth(Object.values(roles)),
+  validation(PV.internshipIdSchema),
+  PS.getInternshipStudents,
+);
+
 // ------------------company completed analytics------------------
 placementRouter.get(
   "/analytics/completed",

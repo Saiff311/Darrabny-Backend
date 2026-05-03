@@ -2,7 +2,63 @@ import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import reportCommentModel from "../../DB/models/reportComment.model.js";
 import reportAttachmentModel from "../../DB/models/reportAttachment.model.js";
 import reportModel from "../../DB/models/report.model.js";
+import { placementModel } from "../../DB/models/placment.model.js";
 import cloudinary from "../../utils/cloudinary.js";
+
+export const createInternEvaluation = asyncHandler(async (req, res, next) => {
+  const { placementId, performanceScore, attendance, feedback, reportDate } =
+    req.body;
+
+  const session = await reportModel.startSession();
+  let evaluation;
+  let placement;
+
+  try {
+    await session.withTransaction(async () => {
+      const created = await reportModel.create(
+        [
+          {
+            placementId,
+            performanceScore,
+            attendance,
+            feedback,
+            reportDate,
+          },
+        ],
+        { session },
+      );
+
+      evaluation = created[0];
+
+      placement = await placementModel.findByIdAndUpdate(
+        placementId,
+        { currentPerformance: performanceScore },
+        { new: true, session },
+      );
+
+      if (!placement) {
+        throw new Error("Placement not found");
+      }
+    });
+  } catch (error) {
+    session.endSession();
+    if (error.message === "Placement not found") {
+      return next(new Error("Placement not found", { cause: 404 }));
+    }
+    return next(error);
+  }
+
+  session.endSession();
+
+  return res.status(201).json({
+    success: true,
+    message: "Evaluation saved and placement performance updated",
+    data: {
+      evaluation,
+      placement,
+    },
+  });
+});
 
 export const addReportComments = asyncHandler(async (req, res) => {
   const { id: reportId } = req.params;
@@ -79,7 +135,9 @@ export const uploadReportAttachment = asyncHandler(async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: "Error uploading file", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Error uploading file", error: error.message });
   }
 });
 
@@ -101,7 +159,9 @@ export const deleteReportAttachment = asyncHandler(async (req, res) => {
 
   // Verify attachment belongs to the report
   if (attachment.reportId.toString() !== reportId) {
-    return res.status(400).json({ message: "Attachment does not belong to this report" });
+    return res
+      .status(400)
+      .json({ message: "Attachment does not belong to this report" });
   }
 
   // Check authorization - only uploader or company role can delete
@@ -109,7 +169,9 @@ export const deleteReportAttachment = asyncHandler(async (req, res) => {
   const isCompanyRole = userRole === "company" || companyId;
 
   if (!isUploader && !isCompanyRole) {
-    return res.status(403).json({ message: "Not authorized to delete this attachment" });
+    return res
+      .status(403)
+      .json({ message: "Not authorized to delete this attachment" });
   }
 
   try {
@@ -130,7 +192,9 @@ export const deleteReportAttachment = asyncHandler(async (req, res) => {
     }
 
     // Delete from Cloudinary
-    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
 
     // Delete from DB
     await reportAttachmentModel.findByIdAndDelete(attachmentId);
@@ -140,6 +204,8 @@ export const deleteReportAttachment = asyncHandler(async (req, res) => {
       message: "Attachment deleted successfully",
     });
   } catch (error) {
-    return res.status(500).json({ message: "Error deleting attachment", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Error deleting attachment", error: error.message });
   }
 });
