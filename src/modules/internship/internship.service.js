@@ -5,6 +5,7 @@ import reviewModel from "../../DB/models/review.model.js";
 import userModel from "../../DB/models/user.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
+import { placementModel } from "../../DB/models/placment.model.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import { emailEvent } from "../../services/sendEmail/email.event.js";
 import { escapeRegex } from "../../utils/security/escapeRegax.js";
@@ -12,6 +13,49 @@ import { internshipStatus, roles } from "../../utils/enums.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { analyzeApplicationWithAI } from "../../services/ai/ai.service.js";
 import mongoose from "mongoose";
+import reportModel from "../../DB/models/report.model.js";
+
+// ========================== Get Internship Students ==========================
+export const getInternshipStudents = asyncHandler(async (req, res, next) => {
+  const { internshipId } = req.params;
+
+  const placements = await placementModel
+    .find({ internshipId, status: "ongoing" })
+    .select("_id currentPerformance studentId")
+    .populate({
+      path: "studentId",
+      select: "major university",
+      populate: {
+        path: "userId",
+        select: "firstName lastName email profilePic address",
+      },
+    })
+    .lean();
+
+  if (!placements.length) {
+    return res.status(200).json({
+      success: true,
+      message: "No ongoing placements found for this internship",
+      data: [],
+    });
+  }
+
+  const students = placements.map((placement) => ({
+    placementId: placement._id,
+    currentPerformance: placement.currentPerformance || 0,
+    fullName: `${placement.studentId.userId.firstName} ${placement.studentId.userId.lastName}`,
+    email: placement.studentId.userId.email,
+    avatar: placement.studentId.userId.profilePic?.secure_url || null,
+    university: placement.studentId.university || null,
+    major: placement.studentId.major || null,
+  }));
+
+  return res.status(200).json({
+    success: true,
+    message: "Internship students fetched successfully",
+    data: students,
+  });
+});
 
 // ========================== Add Internship ==========================
 export const addInternship = asyncHandler(async (req, res, next) => {
@@ -42,14 +86,20 @@ export const addInternship = asyncHandler(async (req, res, next) => {
 
   let technicalSkillsArr = [];
   if (typeof req.body.technicalSkills === "string") {
-    technicalSkillsArr = req.body.technicalSkills.split(",").map((s) => s.trim()).filter(Boolean);
+    technicalSkillsArr = req.body.technicalSkills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   } else if (Array.isArray(req.body.technicalSkills)) {
     technicalSkillsArr = req.body.technicalSkills;
   }
 
   let softSkillsArr = [];
   if (typeof req.body.softSkills === "string") {
-    softSkillsArr = req.body.softSkills.split(",").map((s) => s.trim()).filter(Boolean);
+    softSkillsArr = req.body.softSkills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   } else if (Array.isArray(req.body.softSkills)) {
     softSkillsArr = req.body.softSkills;
   }
@@ -106,7 +156,7 @@ export const updateInternship = asyncHandler(async (req, res, next) => {
   const internship = await internshipModel.findOneAndUpdate(
     { _id: internshipId, companyId },
     req.body,
-    { new: true }
+    { new: true },
   );
 
   if (!internship) {
@@ -174,16 +224,53 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     .populate("companyId", "companyName")
     .lean();
 
-  const totalCount = await internshipModel.countDocuments(query);
-
   if (internships.length === 0) {
     return next(new Error("No internships found", { cause: 404 }));
   }
 
+  // === الجديد هنا: حساب عدد الطلبة والتقارير لكل تدريب بالتوازي ===
+  const internshipsWithStats = await Promise.all(
+    internships.map(async (internship) => {
+      // 1. جمع كل placements النشطة الخاصة بالتدريب الحالي
+      const ongoingPlacementIds = await placementModel.distinct("_id", {
+        internshipId: internship._id,
+        status: "ongoing",
+      });
+
+      const studentsCount = ongoingPlacementIds.length;
+
+      // 2. عدد الطلبة الذين لديهم تقرير واحد على الأقل
+      const evaluatedPlacementIds =
+        studentsCount > 0
+          ? await reportModel.distinct("placementId", {
+              placementId: { $in: ongoingPlacementIds },
+            })
+          : [];
+
+      const evaluatedStudentsCount = evaluatedPlacementIds.length;
+
+      // 3. التقارير المعلقة = الطلبة النشطين - الطلبة الذين تم تقييمهم
+      const pendingReportsCount = Math.max(
+        studentsCount - evaluatedStudentsCount,
+        0,
+      );
+
+      // دمج الإحصائيات مع بيانات الإنترن الأصلية
+      return {
+        ...internship,
+        studentsCount,
+        pendingReportsCount,
+      };
+    }),
+  );
+  // ===============================================================
+
+  const totalCount = await internshipModel.countDocuments(query);
+
   return res.status(200).json({
     success: true,
     message: "Internships fetched successfully",
-    data: internships,
+    data: internshipsWithStats,
     pagination: {
       currentPage: Number(page),
       totalPages: Math.ceil(totalCount / limit),
@@ -342,17 +429,17 @@ export const searchInternships = asyncHandler(async (req, res) => {
   if (durationInMonths) filter.durationInMonths = Number(durationInMonths);
 
   if (technicalSkills) {
-  const skillsArr = technicalSkills
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+    const skillsArr = technicalSkills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  if (skillsArr.length > 0) {
-    filter.technicalSkills = {
-      $in: skillsArr.map((skill) => new RegExp(skill, "i")),
-    };
+    if (skillsArr.length > 0) {
+      filter.technicalSkills = {
+        $in: skillsArr.map((skill) => new RegExp(skill, "i")),
+      };
+    }
   }
-}
 
   const skip = (page - 1) * limit;
 
@@ -380,77 +467,78 @@ export const searchInternships = asyncHandler(async (req, res) => {
 });
 
 // ========================== LISTING: Recommended ==========================
-export const getRecommendedInternships = asyncHandler(async (req, res, next) => {
-  const user = await userModel
-    .findById(req.user._id)
-    .select("skills address")
-    .lean();
+export const getRecommendedInternships = asyncHandler(
+  async (req, res, next) => {
+    const user = await userModel
+      .findById(req.user._id)
+      .select("skills address")
+      .lean();
 
-  if (!user) {
-    return next(new Error("User not found", { cause: 404 }));
-  }
+    if (!user) {
+      return next(new Error("User not found", { cause: 404 }));
+    }
 
-  // normalize user skills
-  const userSkills =
-    (user.skills || []).map((s) => s.toLowerCase().trim());
+    // normalize user skills
+    const userSkills = (user.skills || []).map((s) => s.toLowerCase().trim());
 
-  const internships = await internshipModel
-    .find({ deletedAt: { $exists: false } })
-    .populate("companyId", "companyName logo")
-    .lean();
+    const internships = await internshipModel
+      .find({ deletedAt: { $exists: false } })
+      .populate("companyId", "companyName logo")
+      .lean();
 
-  const scored = internships.map((i) => {
-    const internshipSkills =
-      (i.technicalSkills || []).map((s) => s.toLowerCase().trim());
+    const scored = internships.map((i) => {
+      const internshipSkills = (i.technicalSkills || []).map((s) =>
+        s.toLowerCase().trim(),
+      );
 
-    // matching
-    const matchedSkills = internshipSkills.filter((skill) =>
-      userSkills.includes(skill)
-    );
+      // matching
+      const matchedSkills = internshipSkills.filter((skill) =>
+        userSkills.includes(skill),
+      );
 
-    // skill score
-    const skillScore = internshipSkills.length
-      ? matchedSkills.length / internshipSkills.length
-      : 0;
-
-    // location score
-    const locationScore =
-      user.address?.city &&
-      i.internshipLocation?.toLowerCase() === user.address.city.toLowerCase()
-        ? 0.2
+      // skill score
+      const skillScore = internshipSkills.length
+        ? matchedSkills.length / internshipSkills.length
         : 0;
 
-    // recency score
-    const ageDays =
-      (Date.now() - new Date(i.createdAt).getTime()) /
-      (1000 * 60 * 60 * 24);
+      // location score
+      const locationScore =
+        user.address?.city &&
+        i.internshipLocation?.toLowerCase() === user.address.city.toLowerCase()
+          ? 0.2
+          : 0;
 
-    const recencyScore = Math.max(0, 0.2 - ageDays * 0.001);
+      // recency score
+      const ageDays =
+        (Date.now() - new Date(i.createdAt).getTime()) / (1000 * 60 * 60 * 24);
 
-    const matchScore = Number(
-      (skillScore * 0.6 + locationScore + recencyScore).toFixed(2)
-    );
+      const recencyScore = Math.max(0, 0.2 - ageDays * 0.001);
 
-    return {
-      ...i,
-      matchScore,
-      matchedSkills,
-      why:
-        matchedSkills.length > 0
-          ? `Matches your skills: ${matchedSkills.join(", ")}`
-          : "Recently added internship",
-    };
-  });
+      const matchScore = Number(
+        (skillScore * 0.6 + locationScore + recencyScore).toFixed(2),
+      );
 
-  const sorted = scored
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, 10);
+      return {
+        ...i,
+        matchScore,
+        matchedSkills,
+        why:
+          matchedSkills.length > 0
+            ? `Matches your skills: ${matchedSkills.join(", ")}`
+            : "Recently added internship",
+      };
+    });
 
-  return res.status(200).json({
-    success: true,
-    data: sorted,
-  });
-});
+    const sorted = scored
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 10);
+
+    return res.status(200).json({
+      success: true,
+      data: sorted,
+    });
+  },
+);
 
 // ========================== REVIEWS: Get Reviews ==========================
 export const getReviews = asyncHandler(async (req, res, next) => {
@@ -473,7 +561,9 @@ export const getReviews = asyncHandler(async (req, res, next) => {
   const averageRating =
     reviews.length > 0
       ? Number(
-          (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+          (
+            reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
+          ).toFixed(1),
         )
       : 0;
 
@@ -505,13 +595,20 @@ export const addReview = asyncHandler(async (req, res, next) => {
 
   if (!application) {
     return next(
-      new Error("You can only review internships you have applied to", { cause: 403 })
+      new Error("You can only review internships you have applied to", {
+        cause: 403,
+      }),
     );
   }
 
-  const existing = await reviewModel.findOne({ internshipId, userId: req.user._id });
+  const existing = await reviewModel.findOne({
+    internshipId,
+    userId: req.user._id,
+  });
   if (existing) {
-    return next(new Error("You have already reviewed this internship", { cause: 409 }));
+    return next(
+      new Error("You have already reviewed this internship", { cause: 409 }),
+    );
   }
 
   const review = await reviewModel.create({
@@ -551,7 +648,9 @@ export const getInternshipApp = asyncHandler(async (req, res, next) => {
     !company.HRs.includes(req.user._id)
   ) {
     return next(
-      new Error("You are not authorized to perform this action", { cause: 403 })
+      new Error("You are not authorized to perform this action", {
+        cause: 403,
+      }),
     );
   }
 
@@ -563,7 +662,9 @@ export const getInternshipApp = asyncHandler(async (req, res, next) => {
     },
   ]);
 
-  const totalCount = await applicationModel.countDocuments({ internshipId: internship._id });
+  const totalCount = await applicationModel.countDocuments({
+    internshipId: internship._id,
+  });
 
   return res.status(200).json({
     success: true,
@@ -595,11 +696,13 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
 
   // 2. التحقق من حالة التدريب
   const isOpen = internship.status
-    ? ["onboarding","active", "starting_soon"].includes(internship.status)
+    ? ["onboarding", "active", "starting_soon"].includes(internship.status)
     : !internship.closed;
 
   if (!isOpen) {
-    return next(new Error("Internship not open for applications", { cause: 409 }));
+    return next(
+      new Error("Internship not open for applications", { cause: 409 }),
+    );
   }
 
   // 3. منع التقديم المتكرر
@@ -610,7 +713,7 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
 
   if (alreadyApplied) {
     return next(
-      new Error("You have already applied for this internship", { cause: 409 })
+      new Error("You have already applied for this internship", { cause: 409 }),
     );
   }
 
@@ -644,7 +747,10 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
           .filter(Boolean);
       }
     } catch {
-      skillsArr = skills.split(",").map((s) => s.trim()).filter(Boolean);
+      skillsArr = skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
   } else {
     skillsArr = Array.isArray(student.skills)
@@ -710,7 +816,9 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
   } catch (err) {
     if (err?.code === 11000) {
       return next(
-        new Error("You have already applied for this internship", { cause: 409 })
+        new Error("You have already applied for this internship", {
+          cause: 409,
+        }),
       );
     }
     throw err;
@@ -749,7 +857,9 @@ export const responseApp = asyncHandler(async (req, res, next) => {
 
   if (!isAuthorized) {
     return next(
-      new Error("You are not authorized to perform this action", { cause: 403 })
+      new Error("You are not authorized to perform this action", {
+        cause: 403,
+      }),
     );
   }
 

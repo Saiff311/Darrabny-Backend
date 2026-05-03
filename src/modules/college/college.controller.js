@@ -1,58 +1,109 @@
-import { Router } from "express"
-import * as CS from "./college.service.js"
-import * as CV from "./college.validation.js"
+import { Router } from "express";
+import * as CS from "./college.service.js";
+import * as CV from "./college.validation.js";
 import { validation } from "../../middleware/validation.js";
-import {auth} from "../../middleware/auth.js"
-import {hostMulter, fileTypes} from "../../middleware/multer.js"
+import { auth } from "../../middleware/auth.js";
+import { hostMulter, fileTypes } from "../../middleware/multer.js";
 import { roles } from "../../utils/enums.js";
 
-const collegeRouter = Router()
+const collegeRouter = Router();
 
-collegeRouter.post("/addCollege",
-    hostMulter([...fileTypes.image, fileTypes.pdf]).single("attachment"),
-    validation(CV.addCollegeSchema),
-    auth(Object.values(roles)),
-    CS.addCollege)
+collegeRouter.post(
+  "/signup",
+  validation(CV.collegeSignupSchema),
+  CS.collegeSignup,
+);
 
-collegeRouter.put("/updateCollege/:collegeId",
-    validation(CV.updateCollegeSchema),
-    auth(Object.values(roles)),
-    CS.updateCollege)
+collegeRouter.post(
+  "/signin",
+  validation(CV.collegeSigninSchema),
+  CS.collegeSignin,
+);
 
-collegeRouter.delete("/softDeleteCollege/:collegeId",
-    validation(CV.softDeleteCollegeSchema),
-    auth(Object.values(roles)),
-    CS.softDeleteCollege)
+collegeRouter.post(
+  "/addCollege",
+  hostMulter([...fileTypes.image, fileTypes.pdf]).single("attachment"),
+  validation(CV.addCollegeSchema),
+  auth(Object.values(roles)),
+  CS.addCollege,
+);
 
-collegeRouter.get("/getCollege/:collegeId",
-    validation(CV.getCollegeSchema),
-    auth(Object.values(roles)),
-    CS.getCollege)
+collegeRouter.put(
+  "/updateCollege/:collegeId",
+  validation(CV.updateCollegeSchema),
+  auth(Object.values(roles)),
+  CS.updateCollege,
+);
 
-collegeRouter.get("/getCollegeByName",
-    validation(CV.getCollegeByNameSchema),
-    auth(Object.values(roles)),
-    CS.getCollegeByName)
+collegeRouter.delete(
+  "/softDeleteCollege/:collegeId",
+  validation(CV.softDeleteCollegeSchema),
+  auth(Object.values(roles)),
+  CS.softDeleteCollege,
+);
 
-collegeRouter.patch("/uploadCollegeLogo/:collegeId",
-    hostMulter(fileTypes.image).single("attachment"),
-    // validation(CV.uploadCollegeLogoSchema),
-    auth(Object.values(roles)),
-    CS.uploadCollegeLogo)
+// ------------------ Get All Universities ------------------
+collegeRouter.get(
+  "/universities",
+  auth([roles.company]),
+  validation(CV.getAllUniversitiesSchema),
+  CS.getAllUniversities,
+);
 
-collegeRouter.patch("/UploadCollegeCover/:collegeId",
-    hostMulter(fileTypes.image).single("attachment"),
-    auth(Object.values(roles)),
-    CS.UploadCollegeCover)
+collegeRouter.get(
+  "/getCollege/:collegeId",
+  validation(CV.getCollegeSchema),
+  auth(Object.values(roles)),
+  CS.getCollege,
+);
 
-collegeRouter.delete("/deleteCollegeLogo/:collegeId",
-    validation(CV.deleteCollegeLogoSchema),
-    auth(Object.values(roles)),
-    CS.deleteCollegeLogo)
+collegeRouter.get(
+  "/getCollegeByName",
+  validation(CV.getCollegeByNameSchema),
+  auth(Object.values(roles)),
+  CS.getCollegeByName,
+);
 
-collegeRouter.delete("/deleteCollegeCover/:collegeId",
-    validation(CV.deleteCollegeCoverSchema),
-    auth(Object.values(roles)),
-    CS.deleteCollegeCover)
+collegeRouter.patch(
+  "/uploadCollegeLogo/:collegeId",
+  hostMulter(fileTypes.image).single("attachment"),
+  // validation(CV.uploadCollegeLogoSchema),
+  auth(Object.values(roles)),
+  CS.uploadCollegeLogo,
+);
 
-export default collegeRouter
+collegeRouter.patch(
+  "/UploadCollegeCover/:collegeId",
+  hostMulter(fileTypes.image).single("attachment"),
+  auth(Object.values(roles)),
+  CS.UploadCollegeCover,
+);
+
+collegeRouter.delete(
+  "/deleteCollegeLogo/:collegeId",
+  validation(CV.deleteCollegeLogoSchema),
+  auth(Object.values(roles)),
+  CS.deleteCollegeLogo,
+);
+
+collegeRouter.delete(
+  "/deleteCollegeCover/:collegeId",
+  validation(CV.deleteCollegeCoverSchema),
+  auth(Object.values(roles)),
+  CS.deleteCollegeCover,
+);
+
+collegeRouter.get(
+  "/pending-endorsements",
+  auth([roles.college]),
+  CS.getPendingEndorsements,
+);
+
+collegeRouter.patch(
+  "/respondToEndorsementRequest/:requestId",
+  validation(CV.respondToEndorsementRequestSchema),
+  auth([roles.college]),
+  CS.respondToEndorsementRequest,
+);
+
+export default collegeRouter;

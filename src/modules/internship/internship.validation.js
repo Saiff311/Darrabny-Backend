@@ -9,7 +9,7 @@ import {
 
 // ========================== Add Internship ==========================
 export const addInternshipSchema = Joi.object({
-  internshipTitle: Joi.string().trim().required(),   // ✅ internshipTitle
+  internshipTittle: Joi.string().trim().required(),   // ✅ internshipTitle
 
   internshipLocation: Joi.string()
     .valid(...Object.values(internshipLocations))
@@ -43,7 +43,6 @@ export const addInternshipSchema = Joi.object({
 
   isFeatured: Joi.boolean().optional(),
 
-  supervisorId: generalRules.id.required(),
 });
 
 // ========================== Update Internship ==========================

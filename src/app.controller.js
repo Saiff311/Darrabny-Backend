@@ -67,6 +67,7 @@ import internshipReportRouter from "./modules/internshipReport/internshipReport.
 import applicationRouter from "./modules/application/applicaion.controller.js";
 import placementRouter from "./modules/placement/placement.controller.js";
 import reportRouter from "./modules/report/report.controller.js";
+import collegeRouter from "./modules/college/college.controller.js";
 
 const bootstrap = (app, express) => {
   connectDB();
@@ -82,6 +83,7 @@ const bootstrap = (app, express) => {
   app.use("/internship", internshipRouter);
   app.use("/admin", adminRouter);
   app.use("/chat", chatRouter);
+  app.use("/college", collegeRouter);
   app.use("/internship", internshipRouter);
   app.use("/internshipreport", internshipReportRouter);
   app.use("/application", applicationRouter);

@@ -97,6 +97,16 @@ companyRouter.post(
   CS.companyLogin,
 );
 
+
+
+// ------------------ Send Endorsement Request ------------------
+companyRouter.post(
+  "/endorsement-request",
+  auth([roles.company]),
+  validation(CV.sendEndorsementRequestSchema),
+  CS.sendEndorsementRequest,
+);
+
 // ------------------ Get Company Applications ------------------
 companyRouter.get(
   "/applications",
