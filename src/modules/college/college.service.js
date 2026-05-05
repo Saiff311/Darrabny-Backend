@@ -1,7 +1,8 @@
 import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
+import applicationModel from "../../DB/models/application.model.js";
 import cloudinary from "../../utils/cloudinary.js";
-import { roles } from "../../utils/enums.js";
+import { appStatus, roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import jwt from "jsonwebtoken";
 import { compare } from "../../utils/security/hashing.js";
@@ -434,5 +435,125 @@ export const respondToEndorsementRequest = asyncHandler(async (req, res, next) =
     success: true,
     message: `Internship endorsement has been ${status} successfully`,
     data: request,
+  });
+});
+
+export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
+  const universityId = req.college?._id;
+
+  if (!universityId) {
+    return next(new Error("College authentication required", { cause: 401 }));
+  }
+
+  const approvedInternships = await internshipApprovalModel
+    .find({
+      universityId,
+      status: "approved",
+    })
+    .populate({
+      path: "internshipId",
+      select:
+        "internshipTittle internshipDescription internshipLocation workingTime technicalSkills softSkills startDate endDate durationInMonths thumbnail status companyId",
+      populate: {
+        path: "reports",
+        select:
+          "studentId title periodStart periodEnd status keyAchievements challengesFaced learningOutcomes technicalSkillScore problemSolvingScore communicationScore initiativeScore internalNote approvedAt createdAt updatedAt",
+        populate: {
+          path: "studentId",
+          select: "firstName lastName email profilePic skills",
+        },
+      },
+    });
+
+  if (!approvedInternships.length) {
+    return res.status(200).json({
+      success: true,
+      message: "No approved internships found for this college",
+      data: [],
+    });
+  }
+
+  const internshipIds = approvedInternships
+    .map((item) => item.internshipId?._id)
+    .filter(Boolean);
+
+  const applications = await applicationModel
+    .find({
+      internshipId: { $in: internshipIds },
+    })
+    .populate({
+      path: "userId",
+      select: "firstName lastName email profilePic skills",
+    })
+    .lean();
+
+  const acceptedApplications = applications.filter((application) => {
+    const latestStatus = application.timeline?.[application.timeline.length - 1]?.status;
+    return latestStatus === appStatus.accepted;
+  });
+
+  const data = approvedInternships
+    .map((approval) => {
+      const internship = approval.internshipId;
+
+      if (!internship) {
+        return null;
+      }
+
+      const internshipApplications = acceptedApplications.filter(
+        (application) => String(application.internshipId) === String(internship._id),
+      );
+
+      const internshipReports = internship.reports || [];
+
+      const interns = internshipApplications.map((application) => {
+        const studentId = String(application.userId?._id || application.userId);
+
+        const reports = internshipReports.filter((report) => {
+          const reportStudentId = String(report.studentId?._id || report.studentId);
+          return reportStudentId === studentId;
+        });
+
+        return {
+          applicationId: application._id,
+          student: application.userId
+            ? {
+                id: application.userId._id,
+                fullName: `${application.userId.firstName} ${application.userId.lastName}`,
+                firstName: application.userId.firstName,
+                lastName: application.userId.lastName,
+                email: application.userId.email,
+                profilePic: application.userId.profilePic,
+                skills: application.userId.skills || [],
+              }
+            : null,
+          reports,
+        };
+      });
+
+      return {
+        internship: {
+          id: internship._id,
+          title: internship.internshipTittle,
+          description: internship.internshipDescription,
+          location: internship.internshipLocation,
+          workingTime: internship.workingTime,
+          technicalSkills: internship.technicalSkills,
+          softSkills: internship.softSkills,
+          startDate: internship.startDate,
+          endDate: internship.endDate,
+          durationInMonths: internship.durationInMonths,
+          thumbnail: internship.thumbnail,
+          status: internship.status,
+        },
+        interns,
+      };
+    })
+    .filter(Boolean);
+
+  return res.status(200).json({
+    success: true,
+    message: "College interns reports fetched successfully",
+    data,
   });
 });

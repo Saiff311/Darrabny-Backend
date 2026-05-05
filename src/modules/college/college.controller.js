@@ -106,4 +106,10 @@ collegeRouter.patch(
   CS.respondToEndorsementRequest,
 );
 
+collegeRouter.get(
+  "/getCollegeInternsReports",
+  auth([roles.college]),
+  CS.getCollegeInternsReports,
+);
+
 export default collegeRouter;
