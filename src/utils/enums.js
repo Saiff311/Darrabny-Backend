@@ -69,6 +69,7 @@ export const reportStatus = {
   under_review: "under_review",
   needs_changes: "needs_changes",
   approved: "approved",
+  ongoing: "ongoing",
 };
 
 Object.freeze(reportStatus);

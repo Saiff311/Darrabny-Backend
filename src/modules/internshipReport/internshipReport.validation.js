@@ -19,38 +19,48 @@ export const createReportSchema = {
     periodStart: Joi.date().required(),
     periodEnd: Joi.date().required(),
     title: Joi.string().trim().min(3).max(200).required(),
-    keyAchievements: Joi.string().trim().min(10).required(),
-    challengesFaced: Joi.string().trim().min(10).required(),
-    learningOutcomes: Joi.string().trim().min(10).required(),
-    selfAssessment: Joi.object({
-      technicalSkill: Joi.number().min(0).max(100).required(),
-      problemSolving: Joi.number().min(0).max(100).required(),
-      communication: Joi.number().min(0).max(100).required(),
-      initiative: Joi.number().min(0).max(100).required(),
-    }).required(),
+    keyAchievements: Joi.string().trim().allow("", null).optional(),
+    challengesFaced: Joi.string().trim().allow("", null).optional(),
+    learningOutcomes: Joi.string().trim().allow("", null).optional(),
+    tasksCompleted: Joi.string().trim().allow("", null).optional(),
+    attendanceNotes: Joi.string().trim().allow("", null).optional(),
+    selfAssessment: Joi.alternatives().try(
+      Joi.string().trim().min(3),
+      Joi.object({
+        technicalSkill: Joi.number().min(0).max(100),
+        problemSolving: Joi.number().min(0).max(100),
+        communication: Joi.number().min(0).max(100),
+        initiative: Joi.number().min(0).max(100),
+      })
+    ).optional(),
     internalNote: Joi.string().optional().allow("", null),
-    status: Joi.string().valid("draft", "submitted").default("draft"),
+    status: Joi.string().valid("draft", "ongoing", "in-progress").default("draft"),
   }),
 };
 
 export const updateReportSchema = Joi.object({
   id: generalRules.id.required(),
 
-  keyAchievements: Joi.string().trim().optional(),
-  challengesFaced: Joi.string().trim().optional(),
-  learningOutcomes: Joi.string().trim().optional(),
+  keyAchievements: Joi.string().trim().allow("", null).optional(),
+  challengesFaced: Joi.string().trim().allow("", null).optional(),
+  learningOutcomes: Joi.string().trim().allow("", null).optional(),
+  tasksCompleted: Joi.string().trim().allow("", null).optional(),
+  attendanceNotes: Joi.string().trim().allow("", null).optional(),
   internalNote: Joi.string().trim().optional(),
 
   status: Joi.string()
-    .valid(...Object.values(reportStatus))
+    .valid(...Object.values(reportStatus), "in-progress")
     .optional(),
 
-  selfAssessment: Joi.object({
-    technicalSkill: Joi.number().min(0).max(100),
-    problemSolving: Joi.number().min(0).max(100),
-    communication: Joi.number().min(0).max(100),
-    initiative: Joi.number().min(0).max(100),
-  }).optional(),
+  selfAssessment: Joi.alternatives().try(
+    Joi.string().trim().min(3),
+    Joi.object({
+      technicalSkill: Joi.number().min(0).max(100),
+      problemSolving: Joi.number().min(0).max(100),
+      communication: Joi.number().min(0).max(100),
+      initiative: Joi.number().min(0).max(100),
+    })
+  ).optional(),
 });
 
 export const getReportDetailsSchema = {

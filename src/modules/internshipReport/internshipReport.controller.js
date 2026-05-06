@@ -26,7 +26,7 @@ internshipReportRouter.patch("/:id",
 );
 
 internshipReportRouter.get("/:id",
-  auth([roles.student, roles.company, roles.admin]), // student, company, admin
+  auth([roles.student, roles.company, roles.admin, roles.college]), // student, company, admin, college
   validation(JV.getReportDetailsSchema),
   JS.getReportDetails
 );
