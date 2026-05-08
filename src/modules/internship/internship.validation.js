@@ -29,13 +29,10 @@ export const addInternshipSchema = Joi.object({
     .try(Joi.array().items(Joi.string()), Joi.string())
     .required(),
 
-<<<<<<< HEAD
-=======
   status: Joi.string()
     .valid(...Object.values(internshipStatus))
     .optional(),
 
->>>>>>> feature-StudentDashboard
   startDate: Joi.date().required(),
 
   durationInMonths: Joi.number().integer().min(1).required(),
@@ -51,7 +48,6 @@ export const addInternshipSchema = Joi.object({
 
 // ========================== Update Internship ==========================
 export const updateInternshipSchema = Joi.object({
-<<<<<<< HEAD
   internshipTittle: Joi.string().trim().optional(),
 
   internshipLocation: Joi.string()
@@ -76,17 +72,6 @@ export const updateInternshipSchema = Joi.object({
   closed: Joi.boolean().optional(),
   
   internshipId: generalRules.id.required(), 
-=======
-  internshipTitle: Joi.string().trim(),              // ✅ internshipTitle
-  internshipLocation: Joi.string().valid(...Object.values(internshipLocations)),
-  workingTime: Joi.string().valid(...Object.values(workingTimes)),
-  internshipDescription: Joi.string().trim().min(10),
-  technicalSkills: Joi.array().items(Joi.string()).min(1),
-  softSkills: Joi.array().items(Joi.string()).min(1),
-  internshipId: generalRules.id.required(),
-  closed: Joi.boolean(),
-  isFeatured: Joi.boolean(),
->>>>>>> feature-StudentDashboard
 });
 
 // ========================== Response Application ==========================
