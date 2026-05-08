@@ -15,12 +15,6 @@ const internshipReportSchema = new mongoose.Schema(
       required: true,
     },
 
-    // supervisorId: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "college",
-    //   required: true,
-    // },
-
     attachments: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -88,6 +82,16 @@ const internshipReportSchema = new mongoose.Schema(
       trim: true,
     },
 
+    tasksCompleted: {
+      type: String,
+      trim: true,
+    },
+
+    attendanceNotes: {
+      type: String,
+      trim: true,
+    },
+
     technicalSkillScore: {
       type: Number,
       min: 0,
@@ -131,17 +135,13 @@ const internshipReportSchema = new mongoose.Schema(
 /* ======================================
    Indexes (Performance)
 ====================================== */
-
 internshipReportSchema.index({ internshipId: 1 });
 internshipReportSchema.index({ studentId: 1 });
-internshipReportSchema.index({ supervisorId: 1 });
 internshipReportSchema.index({ status: 1 });
 
 /* ======================================
    Index (Prevent Duplicate Reports)
-   One report per student per internship per period
 ====================================== */
-
 internshipReportSchema.index(
   { internshipId: 1, studentId: 1, periodStart: 1 },
   { unique: true }

@@ -12,7 +12,7 @@ export const signupSchema = joi.object({
     gender : joi.string().valid(genders.male,genders.female),
     DOB:joi.date(),
     mobileNumber : joi.string().required().regex(/^01[0125][0-9]{8}$/),
-    role : joi.string().valid(roles.student, roles.academic_supervisor, roles.company_supervisor, roles.collegeAdmin).required(),
+    role : joi.string().valid(roles.student, roles.academic_supervisor, roles.company_supervisor, roles.college).required(),
     // student fields
     // collegeId: joi.string()
     //     .when('role', { is: roles.student , then: generalRules.id.optional(), otherwise: joi.forbidden() }),

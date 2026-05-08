@@ -8,9 +8,6 @@ import * as RV from "./report.validation.js";
 
 const reportRouter = Router()
 
-// Multer configuration for report attachments
-// Allowed file types: pdf, docx, xlsx, png, jpg
-// Max file size: 10 MB
 const allowedMimeTypes = [
   ...fileTypes.pdf,
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
@@ -19,6 +16,14 @@ const allowedMimeTypes = [
 ];
 
 const uploadAttachmentMulter = hostMulter(allowedMimeTypes, 10);
+
+// -----------------Create intern evaluation------------------
+reportRouter.post(
+    "/evaluation",
+    auth([roles.company]),
+    validation(RV.createInternEvaluationSchema),
+    RS.createInternEvaluation
+)
 
 // -----------------add report comment------------------
 reportRouter.post(

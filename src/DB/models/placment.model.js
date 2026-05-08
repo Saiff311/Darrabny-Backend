@@ -43,6 +43,13 @@ const placementSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    currentPerformance: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+
     finalEvaluation: {
       type: String,
       enum: ["excellent", "very good", "good", "acceptable", "poor"],

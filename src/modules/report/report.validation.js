@@ -15,3 +15,11 @@ export const deleteReportAttachmentSchema = joi.object({
   id: generalRules.id.required(),
   attachmentId: generalRules.id.required(),
 }).required();
+
+export const createInternEvaluationSchema = joi.object({
+  placementId: generalRules.id.required(),
+  performanceScore: joi.number().min(0).max(100).required(),
+  attendance: joi.number().min(0).max(100).required(),
+  feedback: joi.string().trim().allow("", null),
+  reportDate: joi.date().optional(),
+}).required();

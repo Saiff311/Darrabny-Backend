@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import internshipModel from "../../DB/models/internship.model.js";
 import studentModel from "../../DB/models/student.model.js";
-import applicationModel from "../../DB/models/application.model.js";
+import { placementModel } from "../../DB/models/placment.model.js";
 import internshipReportModel from "../../DB/models/internshipReport.model.js";
 import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
 import { reportStatus } from "../../utils/enums.js";
@@ -25,13 +25,18 @@ export const getReportPrefill = asyncHandler(async (req, res, next) => {
     .populate("userId", "username email");
   if (!student) return next(new Error("Student not found", { cause: 404 }));
 
-  /* 3. Check student in internship */
-  const application = await applicationModel.findOne({
+  /* 3. Check student placement in internship */
+  const placement = await placementModel.findOne({
     internshipId,
-    userId: student.userId._id,
+    studentId: student._id,
+    status: "ongoing",
   });
-  if (!application)
-    return next(new Error("Student is not part of this internship", { cause: 403 }));
+
+  if (!placement) {
+    return next(
+      new Error("Student is not actively placed in this internship", { cause: 403 })
+    );
+  }
 
   /* 4. Get Company Supervisor */
   const supervisor = await companySupervisorModel
@@ -102,38 +107,32 @@ export const createReport = asyncHandler(async (req, res, next) => {
     selfAssessment,
     internalNote,
     status,
+    tasksCompleted,
+    attendanceNotes,
   } = req.body;
 
-  // =========================
   // 1. تحقق من الانترنشيب
-  // =========================
   const internship = await internshipModel.findById(internshipId);
-  if (!internship) {
-    return next(new Error("Internship not found", { cause: 404 }));
-  }
+  if (!internship) return next(new Error("Internship not found", { cause: 404 }));
 
-  // =========================
-  // 2. تحقق من الطالب و مشاركته في الانترنشيب
-  // =========================
-  const application = await applicationModel.findOne({
+  // 2. تحقق من أن الطالب موجود فعلياً داخل Placement نشط
+  const placement = await placementModel.findOne({
     internshipId,
-    userId: studentId,
+    studentId,
+    status: "ongoing",
   });
 
-  if (!application) {
+  if (!placement) {
     return next(
-      new Error("Student is not part of this internship", { cause: 403 })
+      new Error("Student is not actively placed in this internship", { cause: 403 })
     );
   }
-
   // Authorization: company must own the internship
-if (req.company._id.toString() !== internship.companyId.toString()) {
-  return next(new Error("Not authorized", { cause: 403 }));
-}
+  if (req.company._id.toString() !== internship.companyId.toString()) {
+    return next(new Error("Not authorized", { cause: 403 }));
+  }
 
-  // =========================
-  // 4. تحقق من عدم وجود تقرير مسبق لنفس الفترة
-  // =========================
+  // 4. تحقق من عدم وجود تقرير مسبق
   const existingReport = await internshipReportModel.findOne({
     internshipId,
     studentId,
@@ -142,16 +141,10 @@ if (req.company._id.toString() !== internship.companyId.toString()) {
   });
 
   if (existingReport) {
-    return next(
-      new Error("Report already exists for this student and period", {
-        cause: 409,
-      })
-    );
+    return next(new Error("Report already exists for this student and period", { cause: 409 }));
   }
 
-  // =========================
   // 5. إنشاء التقرير
-  // =========================
   const report = await internshipReportModel.create({
     internshipId,
     studentId,
@@ -164,48 +157,25 @@ if (req.company._id.toString() !== internship.companyId.toString()) {
     selfAssessment,
     internalNote,
     status,
+    tasksCompleted,
+    attendanceNotes,
     createdBy: req.company._id,
   });
 
-  res.status(201).json({
-    success: true,
-    message: "Internship report created successfully",
-    data: report,
-  });
+  res.status(201).json({ success: true, message: "Internship report created successfully", data: report });
 });
 
 export const updateReport = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-
   const report = await internshipReportModel.findById(id);
 
-  if (!report) {
-    return next(new Error("Report not found", { cause: 404 }));
-  }
+  if (!report) return next(new Error("Report not found", { cause: 404 }));
+  if (report.status === reportStatus.approved) return next(new Error("Approved report cannot be edited", { cause: 400 }));
 
-  /* ==========================
-     1. Prevent editing approved
-  ========================== */
-  if (report.status === reportStatus.approved) {
-    return next(new Error("Approved report cannot be edited", { cause: 400 }));
-  }
-
-  /* ==========================
-     2. Authorization (Company)
-  ========================== */
   const internship = await internshipModel.findById(report.internshipId);
+  if (!internship) return next(new Error("Internship not found", { cause: 404 }));
+  if (req.company._id.toString() !== internship.companyId.toString()) return next(new Error("Not authorized", { cause: 403 }));
 
-  if (!internship) {
-    return next(new Error("Internship not found", { cause: 404 }));
-  }
-
-  if (req.company._id.toString() !== internship.companyId.toString()) {
-    return next(new Error("Not authorized", { cause: 403 }));
-  }
-
-  /* ==========================
-     3. Prepare update data
-  ========================== */
   const {
     keyAchievements,
     challengesFaced,
@@ -213,162 +183,90 @@ export const updateReport = asyncHandler(async (req, res, next) => {
     internalNote,
     status,
     selfAssessment,
+    tasksCompleted,
+    attendanceNotes,
   } = req.body;
 
   const updateData = {};
+  if (keyAchievements !== undefined) updateData.keyAchievements = keyAchievements;
+  if (challengesFaced !== undefined) updateData.challengesFaced = challengesFaced;
+  if (learningOutcomes !== undefined) updateData.learningOutcomes = learningOutcomes;
+  if (internalNote !== undefined) updateData.internalNote = internalNote;
+  if (status !== undefined) updateData.status = status;
+  if (tasksCompleted !== undefined) updateData.tasksCompleted = tasksCompleted;
+  if (attendanceNotes !== undefined) updateData.attendanceNotes = attendanceNotes;
 
-  if (keyAchievements !== undefined)
-    updateData.keyAchievements = keyAchievements;
-
-  if (challengesFaced !== undefined)
-    updateData.challengesFaced = challengesFaced;
-
-  if (learningOutcomes !== undefined)
-    updateData.learningOutcomes = learningOutcomes;
-
-  if (internalNote !== undefined)
-    updateData.internalNote = internalNote;
-
-  if (status !== undefined)
-    updateData.status = status;
-
-  /* ==========================
-     4. Self Assessment Mapping
-  ========================== */
   if (selfAssessment) {
-    if (selfAssessment.technicalSkill !== undefined)
-      updateData.technicalSkillScore = selfAssessment.technicalSkill;
-
-    if (selfAssessment.problemSolving !== undefined)
-      updateData.problemSolvingScore = selfAssessment.problemSolving;
-
-    if (selfAssessment.communication !== undefined)
-      updateData.communicationScore = selfAssessment.communication;
-
-    if (selfAssessment.initiative !== undefined)
-      updateData.initiativeScore = selfAssessment.initiative;
+    if (selfAssessment.technicalSkill !== undefined) updateData.technicalSkillScore = selfAssessment.technicalSkill;
+    if (selfAssessment.problemSolving !== undefined) updateData.problemSolvingScore = selfAssessment.problemSolving;
+    if (selfAssessment.communication !== undefined) updateData.communicationScore = selfAssessment.communication;
+    if (selfAssessment.initiative !== undefined) updateData.initiativeScore = selfAssessment.initiative;
   }
 
-  /* ==========================
-     5. Update
-  ========================== */
-  const updatedReport = await internshipReportModel.findByIdAndUpdate(
-    id,
-    updateData,
-    { new: true }
-  );
-
-  return res.status(200).json({
-    success: true,
-    message: "Report updated successfully",
-    data: updatedReport,
-  });
+  const updatedReport = await internshipReportModel.findByIdAndUpdate(id, updateData, { new: true });
+  return res.status(200).json({ success: true, message: "Report updated successfully", data: updatedReport });
 });
 
 export const getReportDetails = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
 
   /* =========================
-     1. Find report + populate
+     1. Find report + FULL populate
   ========================= */
   const report = await internshipReportModel
     .findById(id)
     .populate({
       path: "studentId",
-      select: "fullName university major role",
+      select: "fullName username university major role",
     })
     .populate({
       path: "internshipId",
       select: "companyId",
     })
-    .lean(); // safe for response layer
+    .populate("attachments") // Populate Attachments
+    .populate({
+      path: "comments", // Populate Comments & their senders
+      populate: { path: "senderId", select: "username email role" }
+    })
+    .lean();
 
-  if (!report) {
-    return next(new Error("Report not found", { cause: 404 }));
-  }
+  if (!report) return next(new Error("Report not found", { cause: 404 }));
 
   /* =========================
-     2. Safe references
+     ... (Authorization checks remain the same) ...
   ========================= */
   const student = report.studentId || null;
   const internship = report.internshipId || null;
   const companyId = req.company?._id?.toString();
+  const collegeId = req.college?._id?.toString();
   const user = req.user;
 
-  /* =========================
-     3. Authorization (SAFE)
-  ========================= */
+  const studentProfile = student?._id
+    ? await studentModel.findOne({ userId: student._id }).select("collegeId").lean()
+    : null;
+
   const isAdmin = user?.role === "admin";
+  const isStudent = user?.role === "student" && student && student._id.toString() === user._id.toString();
+  const isCompany = companyId && internship && internship.companyId?.toString() === companyId;
+  const isCollege =
+    collegeId;
+  const isSupervisor = report.supervisorId && user && report.supervisorId.toString() === user._id.toString();
 
-  const isStudent =
-    user?.role === "student" &&
-    student &&
-    student._id.toString() === user._id.toString();
-
-  const isCompany =
-    companyId &&
-    internship &&
-    internship.companyId?.toString() === companyId;
-
-  const isSupervisor =
-    report.supervisorId &&
-    user &&
-    report.supervisorId.toString() === user._id.toString();
-
-  const isAuthorized = isAdmin || isStudent || isCompany || isSupervisor;
-
-  if (!isAuthorized) {
+  if (!isAdmin && !isStudent && !isCompany && !isCollege && !isSupervisor) {
     return next(new Error("Unauthorized", { cause: 403 }));
   }
 
-  /* =========================
-     4. Placement summary (SAFE)
-  ========================= */
-  let placementSummary = {
-    supervisor: null,
-    startDate: null,
-    endDate: null,
-    currentWeek: 0,
-    totalWeeks: 0,
-    progress: 0,
-  };
-
-  if (report.placement?.startDate && report.placement?.endDate) {
-    const today = new Date();
-    const start = new Date(report.placement.startDate);
-    const end = new Date(report.placement.endDate);
-
-    const msPerDay = 24 * 60 * 60 * 1000;
-
-    const totalWeeks = Math.max(
-      1,
-      Math.ceil((end - start) / msPerDay / 7)
-    );
-
-    const currentWeek = Math.min(
-      Math.ceil((today - start) / msPerDay / 7),
-      totalWeeks
-    );
-
-    const progress = Math.round((currentWeek / totalWeeks) * 100);
-
-    placementSummary = {
-      supervisor: report.placement?.supervisorId
-        ? {
-            id: report.placement.supervisorId._id,
-            fullName: report.placement.supervisorId.fullName,
-          }
-        : null,
-      startDate: report.placement.startDate,
-      endDate: report.placement.endDate,
-      currentWeek,
-      totalWeeks,
-      progress,
-    };
-  }
+  // Calculate Overall Performance Score
+  const technical = report.technicalSkillScore;
+  const problemSolving = report.problemSolvingScore;
+  const communication = report.communicationScore;
+  const initiative = report.initiativeScore;
+  
+  const hasScores = technical != null || problemSolving != null || communication != null || initiative != null;
+  const performanceScore = hasScores ? Math.round(((technical || 0) + (problemSolving || 0) + (communication || 0) + (initiative || 0)) / 4) : null;
 
   /* =========================
-     5. Safe response
+     5. Safe & Formatted response for the new UI
   ========================= */
   return res.status(200).json({
     success: true,
@@ -377,25 +275,173 @@ export const getReportDetails = asyncHandler(async (req, res, next) => {
       title: report.title,
       status: report.status,
       period: report.period,
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd,
 
-      student: student
-        ? {
-            id: student._id,
-            fullName: student.fullName,
-            role: student.role,
-            university: student.university,
-            major: student.major,
-          }
-        : null,
+      student: student ? {
+        id: student._id,
+        fullName: student.fullName || student.username,
+        role: student.role,
+        university: student.university,
+        major: student.major,
+      } : null,
 
-      placement: placementSummary,
-      reflection: report.reflection || null,
-      selfAssessment: report.selfAssessment || null,
+      // Stats
+      tasksCompleted: report.tasksCompleted || "",
+      attendanceNotes: report.attendanceNotes || "",
+      performanceScore: performanceScore,
+
+      // Text Contents
+      keyAchievements: report.keyAchievements || "",
+      challengesFaced: report.challengesFaced || "",
+      learningOutcomes: report.learningOutcomes || "",
+
+      // Mapped Skills Assessment Array
+      skillsAssessment: [
+        { skillName: "Technical Skill", percentage: report.technicalSkillScore || 0 },
+        { skillName: "Problem Solving", percentage: report.problemSolvingScore || 0 },
+        { skillName: "Communication", percentage: report.communicationScore || 0 },
+        { skillName: "Initiative", percentage: report.initiativeScore || 0 },
+      ],
+
+      // Fully Populated Arrays
       attachments: report.attachments || [],
       comments: report.comments || [],
     },
   });
 });
+
+// export const getReportDetails = asyncHandler(async (req, res, next) => {
+//   const { id } = req.params;
+
+//   /* =========================
+//      1. Find report + populate
+//   ========================= */
+//   const report = await internshipReportModel
+//     .findById(id)
+//     .populate({
+//       path: "studentId",
+//       select: "fullName university major role",
+//     })
+//     .populate({
+//       path: "internshipId",
+//       select: "companyId",
+//     })
+//     .lean(); // safe for response layer
+
+//   if (!report) {
+//     return next(new Error("Report not found", { cause: 404 }));
+//   }
+
+//   /* =========================
+//      2. Safe references
+//   ========================= */
+//   const student = report.studentId || null;
+//   const internship = report.internshipId || null;
+//   const companyId = req.company?._id?.toString();
+//   const user = req.user;
+
+//   /* =========================
+//      3. Authorization (SAFE)
+//   ========================= */
+//   const isAdmin = user?.role === "admin";
+
+//   const isStudent =
+//     user?.role === "student" &&
+//     student &&
+//     student._id.toString() === user._id.toString();
+
+//   const isCompany =
+//     companyId &&
+//     internship &&
+//     internship.companyId?.toString() === companyId;
+
+//   const isSupervisor =
+//     report.supervisorId &&
+//     user &&
+//     report.supervisorId.toString() === user._id.toString();
+
+//   const isAuthorized = isAdmin || isStudent || isCompany || isSupervisor;
+
+//   if (!isAuthorized) {
+//     return next(new Error("Unauthorized", { cause: 403 }));
+//   }
+
+//   /* =========================
+//      4. Placement summary (SAFE)
+//   ========================= */
+//   let placementSummary = {
+//     supervisor: null,
+//     startDate: null,
+//     endDate: null,
+//     currentWeek: 0,
+//     totalWeeks: 0,
+//     progress: 0,
+//   };
+
+//   if (report.placement?.startDate && report.placement?.endDate) {
+//     const today = new Date();
+//     const start = new Date(report.placement.startDate);
+//     const end = new Date(report.placement.endDate);
+
+//     const msPerDay = 24 * 60 * 60 * 1000;
+
+//     const totalWeeks = Math.max(
+//       1,
+//       Math.ceil((end - start) / msPerDay / 7)
+//     );
+
+//     const currentWeek = Math.min(
+//       Math.ceil((today - start) / msPerDay / 7),
+//       totalWeeks
+//     );
+
+//     const progress = Math.round((currentWeek / totalWeeks) * 100);
+
+//     placementSummary = {
+//       supervisor: report.placement?.supervisorId
+//         ? {
+//             id: report.placement.supervisorId._id,
+//             fullName: report.placement.supervisorId.fullName,
+//           }
+//         : null,
+//       startDate: report.placement.startDate,
+//       endDate: report.placement.endDate,
+//       currentWeek,
+//       totalWeeks,
+//       progress,
+//     };
+//   }
+
+//   /* =========================
+//      5. Safe response
+//   ========================= */
+//   return res.status(200).json({
+//     success: true,
+//     data: {
+//       id: report._id,
+//       title: report.title,
+//       status: report.status,
+//       period: report.period,
+
+//       student: student
+//         ? {
+//             id: student._id,
+//             fullName: student.fullName,
+//             role: student.role,
+//             university: student.university,
+//             major: student.major,
+//           }
+//         : null,
+
+//       placement: placementSummary,
+//       reflection: report.reflection || null,
+//       selfAssessment: report.selfAssessment || null,
+//       attachments: report.attachments || [],
+//       comments: report.comments || [],
+//     },
+//   });
+// });
 
 export const updateReportStatus = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
@@ -621,3 +667,4 @@ export const downloadReportPDF = asyncHandler(async (req, res, next) => {
 
   doc.end();
 });
+

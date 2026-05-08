@@ -19,7 +19,7 @@ Object.freeze(providers);
 export const roles = {
   student: "student",
   academic_supervisor: "academic_supervisor",
-  collegeAdmin: "college_admin",
+  college: "college",
   company_supervisor: "company_supervisor",
   admin: "admin",
   company: "company",
@@ -69,6 +69,7 @@ export const reportStatus = {
   under_review: "under_review",
   needs_changes: "needs_changes",
   approved: "approved",
+  ongoing: "ongoing",
 };
 
 Object.freeze(reportStatus);

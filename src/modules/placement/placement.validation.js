@@ -6,6 +6,10 @@ export const placementIdSchema = joi.object({
   id: generalRules.id.required(),
 });
 
+export const internshipIdSchema = joi.object({
+  internshipId: generalRules.id.required(),
+});
+
 export const completePlacementSchema = joi
   .object({
     id: generalRules.id.required(),

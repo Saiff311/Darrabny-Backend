@@ -82,3 +82,34 @@ export const deleteCollegeLogoSchema = joi.object({
 export const deleteCollegeCoverSchema = joi.object({
     collegeId : joi.string().length(24).hex().required()
 })
+
+export const collegeSignupSchema = joi.object({
+    collegeName: joi.string().trim().min(2).max(120).required(),
+    collegeEmail: generalRules.email.required(),
+    password: generalRules.password.required(),
+    confirmPassword: generalRules.password.valid(joi.ref("password")).required(),
+    address: joi.string().trim().min(3).max(255).required(),
+    departments: joi.array().items(
+        joi.object({
+            name: joi.string().trim().required(),
+            head: joi.string().trim().required(),
+        })
+    ).optional(),
+});
+
+export const getAllUniversitiesSchema = joi.object({
+  name: joi.string().trim().optional(),
+});
+
+
+export const collegeSigninSchema = joi.object({
+    collegeEmail: generalRules.email.required(),
+    password: joi.string().required(),
+});
+
+export const respondToEndorsementRequestSchema = joi.object({
+    requestId: generalRules.id.required(),
+    status: joi.string().valid("approved", "rejected").required(),
+})
+
+
