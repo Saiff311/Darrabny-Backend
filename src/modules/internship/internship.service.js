@@ -284,10 +284,10 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
 
   // Get saved internships for user
-  const user = await userModel
-    .findById(req.user._id)
-    .select("savedInternships");
-  const savedIds = user?.savedInternships?.map((id) => id.toString()) || [];
+  // const user = await userModel
+  //   .findById(req.user._id)
+  //   .select("savedInternships");
+  // const savedIds = user?.savedInternships?.map((id) => id.toString()) || [];
 
   const internship = await internshipModel
     .findById(internshipId)
@@ -315,7 +315,7 @@ export const getInternshipById = asyncHandler(async (req, res, next) => {
     success: true,
     data: {
       ...internship,
-      isSaved: savedIds.includes(internshipId),
+      // isSaved: savedIds.includes(internshipId),
       reviewSummary: {
         averageRating: stats[0]?.avg || 0,
         totalReviews: stats[0]?.count || 0,

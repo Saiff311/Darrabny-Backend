@@ -59,3 +59,25 @@ export const analyzeApplicationWithAI = async (studentData, internshipData) => {
     };
   }
 };
+
+export const handleChatbotMessage = async (userMessage, chatHistory = []) => {
+  try {
+    const chat = ai.chats.create({
+      model: "gemini-3-flash-preview",
+      config: {
+        systemInstruction:
+          "You are a helpful career advisor and assistant for an internship platform. Keep answers professional, concise, and helpful.",
+        history: Array.isArray(chatHistory) ? chatHistory : [],
+      },
+    });
+
+    const response = await chat.sendMessage({
+      message: userMessage,
+    });
+
+    return response.text;
+  } catch (error) {
+    console.error("Detailed AI Chatbot Error:", error);
+    throw error;
+  }
+};
