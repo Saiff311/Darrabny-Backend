@@ -155,4 +155,46 @@ companyRouter.patch(
   CS.updateNotificationPreferences,
 );
 
+// ------------------ Search Companies ------------------
+companyRouter.get(
+  "/search",
+  validation(CV.searchCompaniesSchema, "query"),
+  CS.searchCompanies,
+);
+
+// ------------------ Get Featured Companies ------------------
+companyRouter.get(
+  "/featured",
+  CS.getFeaturedCompanies
+);
+
+// ------------------ Get All Companies ------------------
+companyRouter.get(
+  "/allCompanies",
+  validation(CV.getAllCompaniesSchema, "query"),
+  CS.getAllCompanies,
+);
+
+// ------------------ Get Company Internships ------------------
+companyRouter.get(
+  "/:companyId/internships",
+  validation(CV.getCompanyInternshipsSchema),
+  CS.getCompanyInternships,
+);
+
+// ------------------ Add Company Review ------------------
+companyRouter.post(
+  "/:companyId/reviews",
+  auth([roles.student]),
+  validation(CV.addCompanyReviewSchema),
+  CS.addCompanyReview
+);
+
+// ------------------ Get Company Reviews ------------------
+companyRouter.get(
+  "/:companyId/reviews",
+  validation(CV.getCompanyReviewsSchema),
+  CS.getCompanyReviews
+);
+
 export default companyRouter;

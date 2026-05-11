@@ -166,3 +166,37 @@ export const updateNotificationPreferencesSchema = joi
   })
   .or("email", "push");
 
+export const searchCompaniesSchema = joi.object({
+  q: joi.string().allow(""),
+  industry: joi.string(),
+  location: joi.string(),
+  page: joi.number().min(1).default(1),
+  limit: joi.number().min(1).max(50).default(10),
+  sort: joi.string().valid("relevant", "popular").default("relevant"),
+});
+
+export const getAllCompaniesSchema = joi.object({
+  page: joi.number().min(1).default(1),
+  limit: joi.number().min(1).max(50).default(10),
+  sort: joi.string().valid("popular", "newest").default("newest"),
+});
+
+export const getCompanyInternshipsSchema = joi.object({
+  companyId: generalRules.id.required(),
+  page: joi.number().min(1).default(1),
+  limit: joi.number().min(1).max(50).default(10),
+});
+
+// ========================= Add Company Review =========================
+export const addCompanyReviewSchema = joi.object({
+  companyId: generalRules.id.required(),
+
+  rating: joi.number().min(1).max(5).required(),
+
+  comment: joi.string().trim().min(3).max(1000).optional(),
+});
+
+// ------------------ Get Company Reviews ------------------
+export const getCompanyReviewsSchema = joi.object({
+  companyId: generalRules.id.required(),
+});

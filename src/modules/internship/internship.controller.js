@@ -57,13 +57,9 @@ internshipRouter.post(
 );
 
 
-
-internshipRouter.get("/my",
-    auth([roles.student]),
-    JS.getStudentInternships
-)
-
 // Update internship
+// PATCH /api/internship/:internshipId  (update)
+
 internshipRouter.patch(
   "/:internshipId",
   auth([roles.company, roles.admin]),
@@ -88,13 +84,6 @@ internshipRouter.patch(
   JS.updateInternship
 );
 
-// Delete internship
-internshipRouter.delete(
-  "/:internshipId",
-  validation(JV.InternshipIdSchema),
-  auth(Object.values(roles)),
-  JS.deleteInternship,
-);
 
 // Get company internships
 // GET /api/internship/companyInternships
@@ -182,19 +171,13 @@ internshipRouter.post(
   JS.addReview
 );
 
-// PATCH /api/internship/:internshipId  (update)
-internshipRouter.patch(
-  "/:internshipId",
-  validation(JV.updateInternshipSchema),
-  auth([roles.company, roles.admin]),
-  JS.updateInternship
-);
+
 
 // DELETE /api/internship/:internshipId
 internshipRouter.delete(
   "/:internshipId",
   validation(JV.InternshipIdSchema),
-  auth(Object.values(roles)),
+  auth([roles.company, roles.admin]),
   JS.deleteInternship
 );
 
