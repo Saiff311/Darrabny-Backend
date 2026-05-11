@@ -46,6 +46,21 @@ const companySchema = new mongoose.Schema(
       trim: true,
       match: /^[0-9+\-\s]{7,20}$/,
     },
+
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+
+    rating: {
+      type: Number,
+      default: 0,
+    },
+
+    totalReviews: {
+      type: Number,
+      default: 0,
+    },
     // ===================== AUTH FIELD =====================
     password: {
       type: String,
@@ -129,6 +144,13 @@ companySchema.virtual("jobs", {
   ref: "jobOpportunity",
   localField: "_id",
   foreignField: "companyId",
+});
+
+// ===================== indexes =====================
+companySchema.index({
+  companyName: "text",
+  industry: "text",
+  address: "text",
 });
 
 const companyModel = mongoose.model("company", companySchema);

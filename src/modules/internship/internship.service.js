@@ -19,6 +19,22 @@ import reportModel from "../../DB/models/report.model.js";
 export const getInternshipStudents = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
 
+  const internship = await internshipModel.findById(internshipId);
+
+  if (!internship) {
+    return next(new Error("Internship not found", { cause: 404 }));
+  }
+
+  if (
+    internship.companyId.toString() !== req.company._id.toString()
+  ) {
+    return next(
+      new Error("You are not authorized to access this internship", {
+        cause: 403,
+      }),
+    );
+  }
+
   const placements = await placementModel
     .find({ internshipId, status: "ongoing" })
     .select("_id currentPerformance studentId")
@@ -173,14 +189,28 @@ export const updateInternship = asyncHandler(async (req, res, next) => {
 // ========================== Delete Internship ==========================
 export const deleteInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
-  const companyId = req.company._id;
 
   const internship = await internshipModel.findById(internshipId);
+
   if (!internship) {
     return next(new Error("Internship not found", { cause: 404 }));
   }
 
-  if (internship.companyId.toString() !== companyId.toString()) {
+  // ✅ لو Company → لازم تكون مالكة الإنترنشيب
+  if (req.company) {
+    if (
+      internship.companyId.toString() !== req.company._id.toString()
+    ) {
+      return next(
+        new Error("You are not authorized to delete this internship", {
+          cause: 403,
+        }),
+      );
+    }
+  }
+
+  // ✅ لو User → لازم يكون Admin فقط
+  else if (req.user?.role !== roles.admin) {
     return next(
       new Error("You are not authorized to delete this internship", {
         cause: 403,
@@ -243,8 +273,8 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
       const evaluatedPlacementIds =
         studentsCount > 0
           ? await reportModel.distinct("placementId", {
-              placementId: { $in: ongoingPlacementIds },
-            })
+            placementId: { $in: ongoingPlacementIds },
+          })
           : [];
 
       const evaluatedStudentsCount = evaluatedPlacementIds.length;
@@ -504,7 +534,7 @@ export const getRecommendedInternships = asyncHandler(
       // location score
       const locationScore =
         user.address?.city &&
-        i.internshipLocation?.toLowerCase() === user.address.city.toLowerCase()
+          i.internshipLocation?.toLowerCase() === user.address.city.toLowerCase()
           ? 0.2
           : 0;
 
@@ -561,10 +591,10 @@ export const getReviews = asyncHandler(async (req, res, next) => {
   const averageRating =
     reviews.length > 0
       ? Number(
-          (
-            reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
-          ).toFixed(1),
-        )
+        (
+          reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
+        ).toFixed(1),
+      )
       : 0;
 
   return res.status(200).json({
@@ -866,7 +896,7 @@ export const responseApp = asyncHandler(async (req, res, next) => {
   application.status = status;
   await application.save();
 
-  emailEvent.on("sendApplicationStatus", application.userId.email, status);
+  emailEvent.emit("sendApplicationStatus", application.userId.email, status);
 
   return res.status(200).json({
     success: true,

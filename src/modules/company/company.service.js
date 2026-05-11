@@ -4,6 +4,7 @@ import internshipModel from "../../DB/models/internship.model.js";
 import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import { internshipAssignmentModel } from "../../DB/models/InternshipAssignment.model.js";
+import companyReviewModel from "../../DB/models/companyReview.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
@@ -103,17 +104,65 @@ export const softDeleteCompany = asyncHandler(async (req, res, next) => {
 export const getCompany = asyncHandler(async (req, res, next) => {
   const { companyId } = req.params;
 
-  // Get company with active internships
-  const company = await companyModel
-    .findById({
-      _id: companyId,
+  // 1. Get company basic info (no populate)
+  const company = await companyModel.findOne({
+    _id: companyId,
+    deletedAt: { $exists: false },
+  }).select(
+    "companyName description industry address logo coverPic rating totalReviews numberOfEmployees createdAt"
+  );
+
+  if (!company) {
+    return next(new Error("Company not found!", { cause: 404 }));
+  }
+
+  // 2. Pagination for internships
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 5;
+  const skip = (page - 1) * limit;
+
+  // 3. Get active internships
+  const internships = await internshipModel
+    .find({
+      companyId,
       deletedAt: { $exists: false },
     })
-    .populate({ path: "jobs", match: { deletedAt: { $exists: false } } });
+    .select("internshipTittle location internshipType createdAt")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
-  if (!company) return next(new Error("Company not found!", { cause: 404 }));
+  // 4. Count stats
+  const activeInternshipsCount = await internshipModel.countDocuments({
+    companyId,
+    deletedAt: { $exists: false },
+  });
 
-  return res.json({ msg: "Company fetched successfully", company });
+  const totalInternshipsCount = await internshipModel.countDocuments({
+    companyId,
+  });
+
+  // 5. Response (clean & frontend-ready)
+  return res.status(200).json({
+    success: true,
+    msg: "Company fetched successfully",
+    company: {
+      ...company.toObject(),
+      stats: {
+        activeInternships: activeInternshipsCount,
+        totalInternships: totalInternshipsCount,
+        rating: company.rating,
+        totalReviews: company.totalReviews,
+      },
+    },
+    internships,
+    pagination: {
+      page,
+      limit,
+      totalPages: Math.ceil(activeInternshipsCount / limit),
+      totalItems: activeInternshipsCount,
+    },
+  });
 });
 
 // ========================== Search Company By Name ==========================
@@ -654,4 +703,336 @@ export const updateNotificationPreferences = asyncHandler(
       data: updatedCompany,
     });
   },
+);
+
+// ========================== Search Companies ==========================
+export const searchCompanies = asyncHandler(async (req, res, next) => {
+  const {
+    q,
+    industry,
+    location,
+    page = 1,
+    limit = 10,
+    sort = "relevant",
+  } = req.query;
+
+  const filter = {
+    deletedAt: { $exists: false },
+  };
+
+  // search query
+  if (q) {
+    filter.companyName = { $regex: q, $options: "i" };
+  }
+
+  // industry filter
+  if (industry) {
+    filter.industry = { $regex: industry, $options: "i" };
+  }
+
+  // location filter
+  if (location) {
+    filter.address = { $regex: location, $options: "i" };
+  }
+
+  const skip = (page - 1) * limit;
+
+  let sortOption = { createdAt: -1 };
+
+  if (sort === "popular") {
+    sortOption = { rating: -1 };
+  }
+
+  const companies = await companyModel
+    .find(filter)
+    .select(
+      "companyName industry address logo rating totalReviews isFeatured",
+    )
+    .sort(sortOption)
+    .skip(skip)
+    .limit(limit);
+
+  const totalItems = await companyModel.countDocuments(filter);
+
+  return res.status(200).json({
+    success: true,
+    results: companies,
+    pagination: {
+      page: Number(page),
+      totalPages: Math.ceil(totalItems / limit),
+      totalItems,
+    },
+  });
+});
+
+// ========================== Featured Companies ==========================
+export const getFeaturedCompanies = asyncHandler(
+  async (req, res, next) => {
+    const companies = await companyModel.find({
+      deletedAt: { $exists: false },
+    });
+
+    const result = await Promise.all(
+      companies.map(async (company) => {
+        // 1. internships count
+        const internshipsCount = await internshipModel.countDocuments({
+          companyId: company._id,
+          deletedAt: { $exists: false },
+        });
+
+        // 2. last activity
+        const lastInternship = await internshipModel
+          .findOne({ companyId: company._id })
+          .sort({ createdAt: -1 });
+
+        const daysSinceLastActivity = lastInternship
+          ? (Date.now() - lastInternship.createdAt) /
+            (1000 * 60 * 60 * 24)
+          : 999;
+
+        const recentActivityScore = Math.max(
+          0,
+          1 - daysSinceLastActivity / 30,
+        );
+
+        // 3. rating normalization (0 → 1 scale)
+        const ratingScore = (company.rating || 0) / 5;
+
+        // 4. internships normalization
+        const internshipScore = Math.min(
+          internshipsCount / 10,
+          1,
+        );
+
+        // 5. final weighted score
+        const score =
+          internshipScore * 0.4 +
+          ratingScore * 0.3 +
+          recentActivityScore * 0.3;
+
+        return {
+          id: company._id,
+          name: company.companyName,
+          logo: company.logo,
+          industry: company.industry,
+          address: company.address,
+          rating: company.rating,
+          totalReviews: company.totalReviews,
+          score: Number(score.toFixed(2)),
+          highlight:
+            score > 0.7
+              ? "🚀 Top Performing Company"
+              : "🔥 Active Hiring Company",
+        };
+      }),
+    );
+
+    // sort by score
+    const featured = result
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    return res.status(200).json({
+      success: true,
+      featured,
+    });
+  },
+);
+
+// ========================== Get All Companies ==========================
+export const getAllCompanies = asyncHandler(async (req, res, next) => {
+  const {
+    page = 1,
+    limit = 10,
+    sort = "newest",
+  } = req.query;
+
+  const skip = (page - 1) * limit;
+
+  let sortOption = { createdAt: -1 };
+
+  if (sort === "popular") {
+    sortOption = { rating: -1 };
+  }
+
+  const companies = await companyModel
+    .find({
+      deletedAt: { $exists: false },
+    })
+    .select(
+      "companyName industry address logo rating totalReviews isFeatured"
+    )
+    .sort(sortOption)
+    .skip(skip)
+    .limit(limit);
+
+  const totalItems = await companyModel.countDocuments({
+    deletedAt: { $exists: false },
+  });
+
+  return res.status(200).json({
+    success: true,
+    companies,
+    pagination: {
+      page: Number(page),
+      totalPages: Math.ceil(totalItems / limit),
+      totalItems,
+    },
+  });
+});
+
+// ========================== Get Company Internships ==========================
+export const getCompanyInternships = asyncHandler(
+  async (req, res, next) => {
+    const { companyId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    const company = await companyModel.findOne({
+      _id: companyId,
+      deletedAt: { $exists: false },
+    });
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    const skip = (page - 1) * limit;
+
+    const internships = await internshipModel
+      .find({
+        companyId,
+        deletedAt: { $exists: false },
+      })
+      .select(
+        "internshipTittle location internshipType createdAt"
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalItems = await internshipModel.countDocuments({
+      companyId,
+      deletedAt: { $exists: false },
+    });
+
+    return res.status(200).json({
+      success: true,
+      internships,
+      pagination: {
+        page: Number(page),
+        totalPages: Math.ceil(totalItems / limit),
+        totalItems,
+      },
+    });
+  },
+);
+
+// ========================== Add Company Review ==========================
+export const addCompanyReview = asyncHandler(
+  async (req, res, next) => {
+    const { companyId } = req.params;
+    const { rating, comment } = req.body;
+
+    // check company exists
+    const company = await companyModel.findOne({
+      _id: companyId,
+      deletedAt: { $exists: false },
+    });
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    // prevent duplicate review
+    const existingReview = await companyReviewModel.findOne({
+      companyId,
+      userId: req.user._id,
+    });
+
+    if (existingReview) {
+      return next(
+        new Error("You already reviewed this company", {
+          cause: 409,
+        })
+      );
+    }
+
+    // create review
+    const review = await companyReviewModel.create({
+      companyId,
+      userId: req.user._id,
+      rating,
+      comment,
+    });
+
+    // aggregate ratings
+    const stats = await companyReviewModel.aggregate([
+      {
+        $match: {
+          companyId: company._id,
+        },
+      },
+      {
+        $group: {
+          _id: "$companyId",
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // update company rating
+    await companyModel.findByIdAndUpdate(companyId, {
+      rating: stats[0]?.averageRating || 0,
+      totalReviews: stats[0]?.totalReviews || 0,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Review added successfully",
+      review,
+    });
+  }
+);
+
+// ========================== Get Company Reviews ==========================
+export const getCompanyReviews = asyncHandler(
+  async (req, res, next) => {
+    const { companyId } = req.params;
+
+    // check company exists
+    const company = await companyModel.findOne({
+      _id: companyId,
+      deletedAt: { $exists: false },
+    });
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    const reviews = await companyReviewModel
+      .find({ companyId })
+      .populate("userId", "fullName profilePic")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+
+      averageRating: company.rating,
+
+      totalReviews: company.totalReviews,
+
+      reviews: reviews.map((review) => ({
+        id: review._id,
+
+        user: review.userId,
+
+        rating: review.rating,
+
+        comment: review.comment,
+
+        date: review.createdAt,
+      })),
+    });
+  }
 );
