@@ -37,7 +37,6 @@ companyRouter.delete(
 companyRouter.get(
   "/getCompany/:companyId",
   validation(CV.getCompanySchema),
-  auth(Object.values(roles)),
   CS.getCompany,
 );
 
