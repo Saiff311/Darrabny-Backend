@@ -152,3 +152,8 @@ export const addReviewSchema = Joi.object({
   rating: Joi.number().min(1).max(5).required(),
   comment: Joi.string().trim().max(1000).optional().allow("", null),
 });
+
+// ========================== TOGGLE SAVE INTERNSHIP ==========================
+export const toggleSaveSchema = Joi.object({
+  internshipId: generalRules.id.required(),
+});

@@ -977,3 +977,59 @@ export const getStudentInternships = asyncHandler(async (req, res, next) => {
     },
   });
 });
+
+// ========================== Toggle Save Internship ==========================
+export const toggleSaveInternship = asyncHandler(async (req, res, next) => {
+  const { internshipId } = req.params;
+
+  const internship = await internshipModel.findOne({
+    _id: internshipId,
+    deletedAt: { $exists: false },
+  });
+
+  if (!internship) {
+    return next(new Error("Internship not found", { cause: 404 }));
+  }
+
+  const user = await userModel.findById(req.user._id);
+
+  const alreadySaved = user.savedInternships.some(
+    (id) => id.toString() === internshipId
+  );
+
+  if (alreadySaved) {
+    user.savedInternships = user.savedInternships.filter(
+      (id) => id.toString() !== internshipId
+    );
+  } else {
+    user.savedInternships.push(internshipId);
+  }
+
+  await user.save();
+
+  return res.status(200).json({
+    success: true,
+    message: alreadySaved
+      ? "Internship removed from saved"
+      : "Internship saved successfully",
+  });
+});
+
+// ========================== Get Saved Internships ==========================
+export const getSavedInternships = asyncHandler(async (req, res, next) => {
+  const user = await userModel
+    .findById(req.user._id)
+    .populate({
+      path: "savedInternships",
+      match: { deletedAt: { $exists: false } },
+      populate: {
+        path: "companyId",
+        select: "companyName logo",
+      },
+    });
+
+  return res.status(200).json({
+    success: true,
+    data: user.savedInternships,
+  });
+});

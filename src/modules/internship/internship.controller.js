@@ -56,6 +56,12 @@ internshipRouter.post(
   JS.addInternship
 );
 
+// GET /api/internship/saved  (get saved internships)
+internshipRouter.get(
+  "/saved",
+  auth([roles.student]),
+  JS.getSavedInternships
+);
 
 // Update internship
 // PATCH /api/internship/:internshipId  (update)
@@ -188,5 +194,14 @@ internshipRouter.get(
   auth(Object.values(roles)),
   JS.getInternshipApp
 );
+
+// PATCH /api/internship/save/:internshipId  (toggle save internship)
+internshipRouter.patch(
+  "/save/:internshipId",
+  validation(JV.toggleSaveSchema),
+  auth([roles.student]),
+  JS.toggleSaveInternship
+);
+
 
 export default internshipRouter;
