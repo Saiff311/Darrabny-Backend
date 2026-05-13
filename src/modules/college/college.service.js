@@ -2,6 +2,8 @@ import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import applicationModel from "../../DB/models/application.model.js";
 import internshipModel from "../../DB/models/internship.model.js";
+import internshipReportModel from "../../DB/models/internshipReport.model.js";
+import studentModel from "../../DB/models/student.model.js";
 import companyModel from "../../DB/models/company.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { internshipStatus, appStatus, roles } from "../../utils/enums.js";
@@ -447,6 +449,15 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     return next(new Error("College authentication required", { cause: 401 }));
   }
 
+  const DEBUG = true;
+
+  const log = (...args) => {
+    if (DEBUG) console.log(...args);
+  };
+
+  // =========================
+  // 1. GET APPROVED INTERNSHIPS
+  // =========================
   const approvedInternships = await internshipApprovalModel
     .find({
       universityId,
@@ -456,15 +467,6 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
       path: "internshipId",
       select:
         "internshipTittle internshipDescription internshipLocation workingTime technicalSkills softSkills startDate endDate durationInMonths thumbnail status companyId",
-      populate: {
-        path: "reports",
-        select:
-          "studentId title periodStart periodEnd status keyAchievements challengesFaced learningOutcomes technicalSkillScore problemSolvingScore communicationScore initiativeScore internalNote approvedAt createdAt updatedAt",
-        populate: {
-          path: "studentId",
-          select: "firstName lastName email profilePic skills",
-        },
-      },
     });
 
   if (!approvedInternships.length) {
@@ -479,6 +481,11 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     .map((item) => item.internshipId?._id)
     .filter(Boolean);
 
+  log("=== INTERNSHIP IDS ===", internshipIds);
+
+  // =========================
+  // 2. GET APPLICATIONS
+  // =========================
   const applications = await applicationModel
     .find({
       internshipId: { $in: internshipIds },
@@ -489,47 +496,201 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     })
     .lean();
 
+  log("=== TOTAL APPLICATIONS ===", applications.length);
+
+  // filter accepted
   const acceptedApplications = applications.filter((application) => {
-    const latestStatus = application.timeline?.[application.timeline.length - 1]?.status;
+    const latestStatus =
+      application.timeline?.[application.timeline.length - 1]?.status;
+
     return latestStatus === appStatus.accepted;
   });
 
+  const userIds = acceptedApplications
+    .map((application) =>
+      application.userId?._id?.toString() || application.userId?.toString(),
+    )
+    .filter(Boolean);
+
+  const students = await studentModel
+    .find({ userId: { $in: userIds } })
+    .select("userId")
+    .lean();
+
+  const userToStudentMap = new Map(
+    students.map((student) => [
+      student.userId?.toString(),
+      student._id?.toString(),
+    ]),
+  );
+
+  log("=== ACCEPTED APPLICATIONS ===", acceptedApplications.length);
+
+  // =========================
+  // 3. GET REPORTS (IMPORTANT FIX)
+  // =========================
+  const reports = await internshipReportModel
+    .find({
+      internshipId: { $in: internshipIds },
+    })
+    .select(
+      "internshipId studentId title periodStart periodEnd status keyAchievements challengesFaced learningOutcomes technicalSkillScore problemSolvingScore communicationScore initiativeScore internalNote approvedAt createdAt updatedAt"
+    )
+    .populate({
+      path: "studentId",
+      select: "firstName lastName email profilePic skills",
+    })
+    .lean();
+
+  log("=== TOTAL REPORTS ===", reports.length);
+    console.log(reports);
+    
+  // =========================
+  // 4. INDEX REPORTS BY INTERNSHIP
+  // =========================
+ const reportsByInternship = new Map();
+
+console.log("\n==============================");
+console.log("=== START GROUPING REPORTS ===");
+console.log("==============================\n");
+
+for (const [index, report] of reports.entries()) {
+  console.log("\n--------------------------------");
+  console.log(`REPORT #${index + 1}`);
+  console.log("--------------------------------");
+
+  console.log("RAW REPORT:");
+  console.log(report);
+
+  const internshipIdStr = report.internshipId?.toString();
+
+  console.log("EXTRACTED internshipId:");
+  console.log({
+    raw: report.internshipId,
+    normalized: internshipIdStr,
+  });
+
+  if (!internshipIdStr) {
+    console.log("❌ SKIPPED REPORT - NO internshipId");
+    continue;
+  }
+
+  const existsBefore = reportsByInternship.has(internshipIdStr);
+
+  console.log("MAP STATE BEFORE INSERT:");
+  console.log({
+    internshipId: internshipIdStr,
+    alreadyExists: existsBefore,
+    currentMapSize: reportsByInternship.size,
+  });
+
+  if (!existsBefore) {
+    console.log("🆕 Creating new array for this internship");
+    reportsByInternship.set(internshipIdStr, []);
+  }
+
+  reportsByInternship.get(internshipIdStr).push(report);
+
+  console.log("✅ REPORT ADDED");
+
+  console.log("MAP STATE AFTER INSERT:");
+  console.log(
+    Array.from(reportsByInternship.entries()).map(([key, value]) => ({
+      internshipId: key,
+      reportsCount: value.length,
+    }))
+  );
+}
+
+console.log("\n==============================");
+console.log("=== FINAL GROUPED RESULT ===");
+console.log("==============================");
+
+for (const [key, value] of reportsByInternship.entries()) {
+  console.log("\nINTERN-SHIP GROUP:");
+  console.log("internshipId:", key);
+  console.log("reportsCount:", value.length);
+
+  console.log("reports preview:");
+  console.log(
+    value.map((r) => ({
+      id: r._id,
+      internshipId: r.internshipId,
+      studentId: r.studentId,
+      title: r.title,
+    }))
+  );
+}
+
+  // =========================
+  // 5. BUILD RESPONSE
+  // =========================
   const data = approvedInternships
     .map((approval) => {
       const internship = approval.internshipId;
 
-      if (!internship) {
-        return null;
-      }
+      if (!internship) return null;
 
+      const internshipIdStr = internship._id?.toString();
+
+      // applications for this internship
       const internshipApplications = acceptedApplications.filter(
-        (application) => String(application.internshipId) === String(internship._id),
+        (application) =>
+          application.internshipId?.toString() === internshipIdStr
       );
 
-      const internshipReports = internship.reports || [];
+      // reports for this internship
+      const internshipReports =
+        reportsByInternship.get(internshipIdStr) || [];
 
+      // index reports by student
+      const reportsByStudent = new Map();
+
+      for (const report of internshipReports) {
+        const studentIdStr =
+          report.studentId?._id?.toString() ||
+          report.studentId?.toString();
+
+        if (!studentIdStr) continue;
+
+        if (!reportsByStudent.has(studentIdStr)) {
+          reportsByStudent.set(studentIdStr, []);
+        }
+
+        reportsByStudent.get(studentIdStr).push(report);
+      }
+
+      // interns mapping
       const interns = internshipApplications.map((application) => {
-        const studentId = String(application.userId?._id || application.userId);
+        const userIdStr =
+          application.userId?._id?.toString() ||
+          application.userId?.toString();
+        const studentIdStr = userToStudentMap.get(userIdStr) || null;
 
-        const reports = internshipReports.filter((report) => {
-          const reportStudentId = String(report.studentId?._id || report.studentId);
-          return reportStudentId === studentId;
-        });
+        const reports = studentIdStr
+          ? reportsByStudent.get(studentIdStr) || []
+          : [];
+
+        const studentReport = reports[0] || null;
 
         return {
           applicationId: application._id,
+
           student: application.userId
             ? {
-              id: application.userId._id,
-              fullName: `${application.userId.firstName} ${application.userId.lastName}`,
-              firstName: application.userId.firstName,
-              lastName: application.userId.lastName,
-              email: application.userId.email,
-              profilePic: application.userId.profilePic,
-              skills: application.userId.skills || [],
-            }
+                id: studentIdStr,
+                fullName: `${application.userId.firstName} ${application.userId.lastName}`,
+                firstName: application.userId.firstName,
+                lastName: application.userId.lastName,
+                email: application.userId.email,
+                profilePic: application.userId.profilePic,
+                skills: application.userId.skills || [],
+              }
             : null,
+
           reports,
+
+          reportId: studentReport ? studentReport._id : null,
         };
       });
 
@@ -548,11 +709,15 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
           thumbnail: internship.thumbnail,
           status: internship.status,
         },
+
         interns,
       };
     })
     .filter(Boolean);
 
+  // =========================
+  // FINAL RESPONSE
+  // =========================
   return res.status(200).json({
     success: true,
     message: "College interns reports fetched successfully",

@@ -11,7 +11,7 @@ const internshipReportSchema = new mongoose.Schema(
 
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "user",
+      ref: "student",
       required: true,
     },
 
