@@ -719,3 +719,121 @@ export const getCollegeDashboard = asyncHandler(async (req, res, next) => {
     },
   });
 });
+
+// ========================= Get College Settings =========================
+export const getCollegeSettings = asyncHandler(async (req, res, next) => {
+  const collegeId = req.college?._id;
+
+  if (!collegeId) {
+    return next(new Error("College authentication required", { cause: 401 }));
+  }
+
+  const college = await collegeModel
+    .findById(collegeId)
+    .select("collegeName collegeEmail address notifications");
+
+  if (!college) {
+    return next(new Error("College not found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: college,
+  });
+});
+
+// ========================= Update College Settings =========================
+export const updateCollegeSettings = asyncHandler(async (req, res, next) => {
+  const collegeId = req.college?._id;
+  const { collegeName, collegeEmail, address } = req.body;
+
+  if (!collegeId) {
+    return next(new Error("College authentication required", { cause: 401 }));
+  }
+
+  const currentCollege = await collegeModel.findById(collegeId);
+  if (!currentCollege) {
+    return next(new Error("College not found", { cause: 404 }));
+  }
+
+  if (currentCollege.deletedAt || currentCollege.bannedAt) {
+    return next(new Error("College is deleted or banned", { cause: 403 }));
+  }
+
+  if (collegeEmail && collegeEmail !== currentCollege.collegeEmail) {
+    const emailExists = await collegeModel.findOne({
+      collegeEmail,
+      _id: { $ne: collegeId },
+    });
+    if (emailExists) {
+      return next(new Error("Email already exists", { cause: 409 }));
+    }
+  }
+
+  if (collegeName && collegeName !== currentCollege.collegeName) {
+    const nameExists = await collegeModel.findOne({
+      collegeName,
+      _id: { $ne: collegeId },
+    });
+    if (nameExists) {
+      return next(new Error("College name already exists", { cause: 409 }));
+    }
+  }
+
+  const updates = {};
+  if (collegeName !== undefined) updates.collegeName = collegeName;
+  if (collegeEmail !== undefined) updates.collegeEmail = collegeEmail;
+  if (address !== undefined) updates.address = address;
+
+  const updatedCollege = await collegeModel.findByIdAndUpdate(
+    collegeId,
+    updates,
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: "College settings updated successfully",
+    data: updatedCollege,
+  });
+});
+
+// ========================= Update Notification Preferences =========================
+export const updateNotificationPreferences = asyncHandler(
+  async (req, res, next) => {
+    const collegeId = req.college?._id;
+    const { email, push } = req.body;
+
+    if (!collegeId) {
+      return next(new Error("College authentication required", { cause: 401 }));
+    }
+
+    const updates = {};
+    if (email !== undefined) updates["notifications.email"] = email;
+    if (push !== undefined) updates["notifications.push"] = push;
+
+    const updatedCollege = await collegeModel
+      .findByIdAndUpdate(
+        collegeId,
+        { $set: updates },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .select("collegeName notifications");
+
+    if (!updatedCollege) {
+      return next(new Error("College not found", { cause: 404 }));
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification preferences updated successfully",
+      data: updatedCollege,
+    });
+  },
+);

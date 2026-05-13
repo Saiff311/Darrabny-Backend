@@ -112,4 +112,23 @@ export const respondToEndorsementRequestSchema = joi.object({
     status: joi.string().valid("approved", "rejected").required(),
 })
 
+// ------------------ emptySchema ------------------
+export const emptySchema = joi.object().length(0)
+
+// ------------------ College Settings ------------------
+export const updateCollegeSettingsSchema = joi
+    .object({
+        collegeName: joi.string().trim().min(2).max(60).optional(),
+        collegeEmail: generalRules.email.optional(),
+        address: joi.string().trim().min(3).max(255).optional(),
+    })
+    .or("collegeName", "collegeEmail", "address")
+
+export const updateNotificationPreferencesSchema = joi
+    .object({
+        email: joi.boolean().optional(),
+        push: joi.boolean().optional(),
+    })
+    .or("email", "push")
+
 

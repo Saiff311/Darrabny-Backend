@@ -64,6 +64,30 @@ collegeRouter.get(
   CS.getCollegeByName,
 );
 
+// ------------------ College Settings ------------------
+collegeRouter.get(
+  "/settings",
+  auth([roles.college]),
+  validation(CV.emptySchema),
+  CS.getCollegeSettings,
+);
+
+// ------------------ Update College Settings ------------------
+collegeRouter.patch(
+  "/settings",
+  auth([roles.college]),
+  validation(CV.updateCollegeSettingsSchema),
+  CS.updateCollegeSettings,
+);
+
+// ------------------ Update College Notification Preferences ------------------
+collegeRouter.patch(
+  "/settings/notifications",
+  auth([roles.college]),
+  validation(CV.updateNotificationPreferencesSchema),
+  CS.updateNotificationPreferences,
+);
+
 collegeRouter.patch(
   "/uploadCollegeLogo/:collegeId",
   hostMulter(fileTypes.image).single("attachment"),
