@@ -4,6 +4,7 @@ import userModel from "../../DB/models/user.model.js";
 import { compare } from "../../utils/security/hashing.js";
 import { decrypt } from "../../utils/security/encryption.js";
 import studentModel from "../../DB/models/student.model.js";
+import internshipReportModel from "../../DB/models/internshipReport.model.js";
 
 // ========================== Update Student Account ==========================
 export const UpdateStudentAccount = asyncHandler(async (req, res, next) => {
@@ -46,6 +47,96 @@ export const getLoginStudent = asyncHandler(async (req, res, next) => {
   user.mobileNumber = await decrypt(user.mobileNumber);
 
   return res.status(200).json({ msg: "My Profile", user });
+});
+
+// ========================== Student Reviews ==========================
+export const getStudentReviews = asyncHandler(async (req, res, next) => {
+  const { studentId } = req.params;
+  const page = Number.parseInt(req.query.page, 10) || 1;
+  const limit = Number.parseInt(req.query.limit, 10) || 10;
+
+  const safePage = page > 0 ? page : 1;
+  const safeLimit = limit > 0 ? limit : 10;
+
+  const student = await studentModel
+    .findById(studentId)
+    .select("points badges certificates");
+
+  if (!student) return next(new Error("Student not found", { cause: 404 }));
+
+  const filterQuery = { studentId, overallRating: { $ne: null } };
+  const skip = (safePage - 1) * safeLimit;
+
+  const [reports, totalCount] = await Promise.all([
+    internshipReportModel
+      .find(filterQuery)
+      .populate({
+        path: "internshipId",
+        select: "title companyId",
+        populate: {
+          path: "companyId",
+          select: "companyName logo",
+        },
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(safeLimit)
+      .lean(),
+    internshipReportModel.countDocuments(filterQuery),
+  ]);
+
+  const certificateByInternship = new Map();
+  for (const certificate of student.certificates || []) {
+    if (!certificate?.internshipId || !certificate?.url) continue;
+    const key = certificate.internshipId.toString();
+    const existing = certificateByInternship.get(key);
+    if (!existing || (certificate.date && existing.date < certificate.date)) {
+      certificateByInternship.set(key, {
+        url: certificate.url,
+        date: certificate.date || 0,
+      });
+    }
+  }
+
+  const reviews = reports.map((report) => {
+    const internship = report.internshipId;
+    const company = internship?.companyId;
+    const internshipKey = internship?._id?.toString() || report.internshipId?.toString();
+    const certificateUrl = certificateByInternship.get(internshipKey)?.url || null;
+
+    return {
+      reportId: report._id,
+      internshipTitle: internship?.title || report.title || null,
+      companyName: company?.companyName || null,
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd,
+      overallRating: report.overallRating,
+      detailedScores: {
+        technicalSkill: report.technicalSkillScore,
+        problemSolving: report.problemSolvingScore,
+        communication: report.communicationScore,
+        initiative: report.initiativeScore,
+      },
+      feedback: report.internalNote || null,
+      certificateUrl,
+    };
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Student reviews fetched successfully",
+    gamification: {
+      points: student.points || 0,
+      badges: student.badges || [],
+      certificates: student.certificates || [],
+    },
+    pagination: {
+      currentPage: safePage,
+      totalPages: Math.ceil(totalCount / safeLimit),
+      totalCount,
+    },
+    reviews,
+  });
 });
 
 // ========================== Skills ==========================

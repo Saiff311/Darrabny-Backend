@@ -67,6 +67,34 @@ const studentSchema = new mongoose.Schema(
       public_id: String,
     },
 
+    certificates: [
+      {
+        internshipId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "internship",
+        },
+        url: {
+          type: String,
+          required: true,
+        },
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
+    points: {
+      type: Number,
+      default: 0,
+    },
+
+    badges: [
+      {
+        type: String,
+      },
+    ],
+
     projects: [projectSchema],
   },
   {

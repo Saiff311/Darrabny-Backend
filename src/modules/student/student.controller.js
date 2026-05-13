@@ -119,6 +119,12 @@ StudentRouter.delete(
   US.deleteCoverPic,
 );
 
+StudentRouter.get(
+  "/:studentId/reviews",
+  auth(Object.values(roles)),
+  US.getStudentReviews,
+);
+
 StudentRouter.delete("/softDelete", auth(Object.values(roles)), US.softDelete);
 
 export default StudentRouter;
