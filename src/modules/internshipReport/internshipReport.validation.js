@@ -24,15 +24,17 @@ export const createReportSchema = {
     learningOutcomes: Joi.string().trim().allow("", null).optional(),
     tasksCompleted: Joi.string().trim().allow("", null).optional(),
     attendanceNotes: Joi.string().trim().allow("", null).optional(),
+    certificateUrl: Joi.string().trim().uri().optional(),
     selfAssessment: Joi.alternatives().try(
       Joi.string().trim().min(3),
       Joi.object({
-        technicalSkill: Joi.number().min(0).max(100),
-        problemSolving: Joi.number().min(0).max(100),
-        communication: Joi.number().min(0).max(100),
-        initiative: Joi.number().min(0).max(100),
+        technicalSkill: Joi.number().min(1).max(5),
+        problemSolving: Joi.number().min(1).max(5),
+        communication: Joi.number().min(1).max(5),
+        initiative: Joi.number().min(1).max(5),
       })
     ).optional(),
+    overallRating: Joi.number().min(1).max(5).optional(),
     internalNote: Joi.string().optional().allow("", null),
     status: Joi.string().valid("draft", "ongoing", "in-progress").default("draft"),
   }),
@@ -55,12 +57,13 @@ export const updateReportSchema = Joi.object({
   selfAssessment: Joi.alternatives().try(
     Joi.string().trim().min(3),
     Joi.object({
-      technicalSkill: Joi.number().min(0).max(100),
-      problemSolving: Joi.number().min(0).max(100),
-      communication: Joi.number().min(0).max(100),
-      initiative: Joi.number().min(0).max(100),
+      technicalSkill: Joi.number().min(1).max(5),
+      problemSolving: Joi.number().min(1).max(5),
+      communication: Joi.number().min(1).max(5),
+      initiative: Joi.number().min(1).max(5),
     })
   ).optional(),
+  overallRating: Joi.number().min(1).max(5).optional(),
 });
 
 export const getReportDetailsSchema = {
@@ -90,3 +93,26 @@ export const downloadReportPDFSchema = {
     id: generalRules.id.required(),
   }),
 };
+
+export const addReportCommentSchema = Joi.object({
+  id: generalRules.id.required(),
+  message: Joi.string().trim().min(1).max(2000).required(),
+}).required();
+
+export const uploadReportAttachmentSchema = Joi.object({
+  id: generalRules.id.required(),
+  file: generalRules.file.required(),
+}).required();
+
+export const deleteReportAttachmentSchema = Joi.object({
+  id: generalRules.id.required(),
+  attachmentId: generalRules.id.required(),
+}).required();
+
+export const createInternEvaluationSchema = Joi.object({
+  placementId: generalRules.id.required(),
+  performanceScore: Joi.number().min(0).max(100).required(),
+  attendance: Joi.number().min(0).max(100).required(),
+  feedback: Joi.string().trim().allow("", null),
+  reportDate: Joi.date().optional(),
+}).required();

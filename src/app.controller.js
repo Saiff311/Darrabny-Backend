@@ -66,7 +66,7 @@ import internshipRouter from "./modules/internship/internship.controller.js";
 import internshipReportRouter from "./modules/internshipReport/internshipReport.controller.js";
 import applicationRouter from "./modules/application/applicaion.controller.js";
 import placementRouter from "./modules/placement/placement.controller.js";
-import reportRouter from "./modules/report/report.controller.js";
+// import reportRouter from "./modules/report/report.controller.js";
 import collegeRouter from "./modules/college/college.controller.js";
 
 const bootstrap = (app, express) => {
@@ -88,7 +88,7 @@ const bootstrap = (app, express) => {
   app.use("/internshipreport", internshipReportRouter);
   app.use("/application", applicationRouter);
   app.use("/placement", placementRouter);
-  app.use("/report", reportRouter);
+  // app.use("/report", reportRouter);
 
   app.use(
     "/graphql",

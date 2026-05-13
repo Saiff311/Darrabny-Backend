@@ -94,29 +94,36 @@ const internshipReportSchema = new mongoose.Schema(
 
     technicalSkillScore: {
       type: Number,
-      min: 0,
-      max: 100,
+      min: 1,
+      max: 5,
       default: null,
     },
 
     problemSolvingScore: {
       type: Number,
-      min: 0,
-      max: 100,
+      min: 1,
+      max: 5,
       default: null,
     },
 
     communicationScore: {
       type: Number,
-      min: 0,
-      max: 100,
+      min: 1,
+      max: 5,
       default: null,
     },
 
     initiativeScore: {
       type: Number,
-      min: 0,
-      max: 100,
+      min: 1,
+      max: 5,
+      default: null,
+    },
+
+    overallRating: {
+      type: Number,
+      min: 1,
+      max: 5,
       default: null,
     },
 

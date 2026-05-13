@@ -3,9 +3,263 @@ import internshipModel from "../../DB/models/internship.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import { placementModel } from "../../DB/models/placment.model.js";
 import internshipReportModel from "../../DB/models/internshipReport.model.js";
+import reportModel from "../../DB/models/report.model.js";
+import reportCommentModel from "../../DB/models/reportComment.model.js";
+import reportAttachmentModel from "../../DB/models/reportAttachment.model.js";
 import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
+import cloudinary from "../../utils/cloudinary.js";
 import { reportStatus } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
+
+const BADGE_NAMES = {
+  RISING_STAR: "Rising Star",
+  PRO: "Pro",
+  EXPERT: "Expert",
+};
+
+const computeOverallRating = (scores) => {
+  const normalizedScores = scores.map((score) =>
+    typeof score === "number" ? score : null
+  );
+
+  if (normalizedScores.some((score) => score === null)) {
+    return null;
+  }
+
+  const total = normalizedScores.reduce((sum, score) => sum + score, 0);
+  return total / normalizedScores.length;
+};
+
+export const createInternEvaluation = asyncHandler(async (req, res, next) => {
+  const { placementId, performanceScore, attendance, feedback, reportDate } =
+    req.body;
+
+  const session = await reportModel.startSession();
+  let evaluation;
+  let placement;
+
+  try {
+    await session.withTransaction(async () => {
+      const created = await reportModel.create(
+        [
+          {
+            placementId,
+            performanceScore,
+            attendance,
+            feedback,
+            reportDate,
+          },
+        ],
+        { session },
+      );
+
+      evaluation = created[0];
+
+      placement = await placementModel.findByIdAndUpdate(
+        placementId,
+        { currentPerformance: performanceScore },
+        { new: true, session },
+      );
+
+      if (!placement) {
+        throw new Error("Placement not found");
+      }
+    });
+  } catch (error) {
+    session.endSession();
+    if (error.message === "Placement not found") {
+      return next(new Error("Placement not found", { cause: 404 }));
+    }
+    return next(error);
+  }
+
+  session.endSession();
+
+  return res.status(201).json({
+    success: true,
+    message: "Evaluation saved and placement performance updated",
+    data: {
+      evaluation,
+      placement,
+    },
+  });
+});
+
+export const addReportComments = asyncHandler(async (req, res) => {
+  const { id: reportId } = req.params;
+  const { message } = req.body;
+
+  const senderId = req.user?._id || req.company?._id;
+  const senderRole = req.user?.role || "company";
+
+  if (!senderId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const report = await internshipReportModel.findById(reportId);
+  if (!report) {
+    return res.status(404).json({ message: "Report not found" });
+  }
+
+  const comment = await reportCommentModel.create({
+    reportId,
+    senderId,
+    senderRole,
+    message,
+  });
+
+  report.comments = report.comments || [];
+  report.comments.push(comment._id);
+  await report.save();
+
+  return res.status(201).json({
+    success: true,
+    data: {
+      commentId: comment._id,
+      message: comment.message,
+      createdAt: comment.createdAt,
+    },
+  });
+});
+
+export const uploadReportAttachment = asyncHandler(async (req, res) => {
+  const { id: reportId } = req.params;
+  const uploaderId = req.user?._id || req.company?._id;
+
+  if (!uploaderId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const report = await internshipReportModel.findById(reportId);
+  if (!report) {
+    return res.status(404).json({ message: "Report not found" });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ message: "No file provided" });
+  }
+
+  try {
+    const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+      folder: "report-attachments",
+      resource_type: "auto",
+      public_id: `${reportId}_${Date.now()}`,
+    });
+
+    const attachment = await reportAttachmentModel.create({
+      reportId,
+      fileName: req.file.originalname,
+      fileUrl: cloudinaryResult.secure_url,
+      fileSize: req.file.size,
+      uploadedBy: uploaderId,
+    });
+
+    report.attachments = report.attachments || [];
+    report.attachments.push(attachment._id);
+    await report.save();
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        attachmentId: attachment._id,
+        fileName: attachment.fileName,
+        fileUrl: attachment.fileUrl,
+      },
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Error uploading file", error: error.message });
+  }
+});
+
+export const deleteReportAttachment = asyncHandler(async (req, res) => {
+  const { id: reportId, attachmentId } = req.params;
+  const userId = req.user?._id;
+  const userRole = req.user?.role;
+  const companyId = req.company?._id;
+
+  if (!userId && !companyId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const attachment = await reportAttachmentModel.findById(attachmentId);
+  if (!attachment) {
+    return res.status(404).json({ message: "Attachment not found" });
+  }
+
+  if (attachment.reportId.toString() !== reportId) {
+    return res
+      .status(400)
+      .json({ message: "Attachment does not belong to this report" });
+  }
+
+  const isUploader = attachment.uploadedBy.toString() === userId?.toString();
+  const isCompanyRole = userRole === "company" || companyId;
+
+  if (!isUploader && !isCompanyRole) {
+    return res
+      .status(403)
+      .json({ message: "Not authorized to delete this attachment" });
+  }
+
+  try {
+    const urlParts = attachment.fileUrl.split("/");
+    const publicIdWithExtension = urlParts[urlParts.length - 1];
+    const publicId = `report-attachments/${publicIdWithExtension.split(".")[0]}`;
+
+    const extension = attachment.fileUrl.split(".").pop().toLowerCase();
+
+    let resourceType = "image";
+
+    if (["mp4", "mov", "avi"].includes(extension)) {
+      resourceType = "video";
+    } else if (["pdf", "doc", "docx", "zip"].includes(extension)) {
+      resourceType = "raw";
+    }
+
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
+
+    await reportAttachmentModel.findByIdAndDelete(attachmentId);
+    await internshipReportModel.findByIdAndUpdate(reportId, {
+      $pull: { attachments: attachmentId },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Attachment deleted successfully",
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Error deleting attachment", error: error.message });
+  }
+});
+
+export const uploadCertificate = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file provided" });
+  }
+
+  try {
+    const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+      folder: "InternshipAPP/certificates",
+      resource_type: "auto",
+      public_id: `certificate_${Date.now()}`,
+    });
+
+    return res.status(201).json({
+      success: true,
+      certificateUrl: cloudinaryResult.secure_url,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Error uploading certificate", error: error.message });
+  }
+});
 
 export const getReportPrefill = asyncHandler(async (req, res, next) => {
   const { id: internshipId } = req.params;
@@ -106,10 +360,22 @@ export const createReport = asyncHandler(async (req, res, next) => {
     learningOutcomes,
     selfAssessment,
     internalNote,
-    status,
     tasksCompleted,
     attendanceNotes,
+    certificateUrl,
   } = req.body;
+
+  const technicalSkillScore = selfAssessment?.technicalSkill;
+  const problemSolvingScore = selfAssessment?.problemSolving;
+  const communicationScore = selfAssessment?.communication;
+  const initiativeScore = selfAssessment?.initiative;
+  const overallRating = computeOverallRating([
+    technicalSkillScore,
+    problemSolvingScore,
+    communicationScore,
+    initiativeScore,
+  ]);
+  const points = typeof overallRating === "number" ? Math.round(overallRating * 20) : 0;
 
   // 1. تحقق من الانترنشيب
   const internship = await internshipModel.findById(internshipId);
@@ -154,13 +420,38 @@ export const createReport = asyncHandler(async (req, res, next) => {
     keyAchievements,
     challengesFaced,
     learningOutcomes,
-    selfAssessment,
     internalNote,
-    status,
     tasksCompleted,
     attendanceNotes,
+    technicalSkillScore,
+    problemSolvingScore,
+    communicationScore,
+    initiativeScore,
+    overallRating,
     createdBy: req.company._id,
   });
+
+  const student = await studentModel.findById(studentId);
+  if (!student) return next(new Error("Student not found", { cause: 404 }));
+
+  if (certificateUrl) {
+    student.certificates = student.certificates || [];
+    student.certificates.push({
+      internshipId,
+      url: certificateUrl,
+      date: new Date(),
+    });
+  }
+
+  student.points = (student.points || 0) + points;
+
+  const badgeSet = new Set(student.badges || []);
+  if (student.points >= 100) badgeSet.add(BADGE_NAMES.RISING_STAR);
+  if (student.points >= 300) badgeSet.add(BADGE_NAMES.PRO);
+  if (student.points >= 500) badgeSet.add(BADGE_NAMES.EXPERT);
+  student.badges = Array.from(badgeSet);
+
+  await student.save();
 
   res.status(201).json({ success: true, message: "Internship report created successfully", data: report });
 });
@@ -202,6 +493,18 @@ export const updateReport = asyncHandler(async (req, res, next) => {
     if (selfAssessment.communication !== undefined) updateData.communicationScore = selfAssessment.communication;
     if (selfAssessment.initiative !== undefined) updateData.initiativeScore = selfAssessment.initiative;
   }
+
+  const mergedTechnical = selfAssessment?.technicalSkill ?? report.technicalSkillScore;
+  const mergedProblemSolving = selfAssessment?.problemSolving ?? report.problemSolvingScore;
+  const mergedCommunication = selfAssessment?.communication ?? report.communicationScore;
+  const mergedInitiative = selfAssessment?.initiative ?? report.initiativeScore;
+  const overallRating = computeOverallRating([
+    mergedTechnical,
+    mergedProblemSolving,
+    mergedCommunication,
+    mergedInitiative,
+  ]);
+  updateData.overallRating = overallRating;
 
   const updatedReport = await internshipReportModel.findByIdAndUpdate(id, updateData, { new: true });
   return res.status(200).json({ success: true, message: "Report updated successfully", data: updatedReport });
