@@ -112,4 +112,11 @@ collegeRouter.get(
   CS.getCollegeInternsReports,
 );
 
+// ========================== Get College Dashboard ==========================
+collegeRouter.get(
+  "/dashboard",
+  auth([roles.college]),
+  CS.getCollegeDashboard
+);
+
 export default collegeRouter;

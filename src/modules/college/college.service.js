@@ -1,8 +1,10 @@
 import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import applicationModel from "../../DB/models/application.model.js";
+import internshipModel from "../../DB/models/internship.model.js";
+import companyModel from "../../DB/models/company.model.js";
 import cloudinary from "../../utils/cloudinary.js";
-import { appStatus, roles } from "../../utils/enums.js";
+import { internshipStatus, appStatus, roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import jwt from "jsonwebtoken";
 import { compare } from "../../utils/security/hashing.js";
@@ -518,14 +520,14 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
           applicationId: application._id,
           student: application.userId
             ? {
-                id: application.userId._id,
-                fullName: `${application.userId.firstName} ${application.userId.lastName}`,
-                firstName: application.userId.firstName,
-                lastName: application.userId.lastName,
-                email: application.userId.email,
-                profilePic: application.userId.profilePic,
-                skills: application.userId.skills || [],
-              }
+              id: application.userId._id,
+              fullName: `${application.userId.firstName} ${application.userId.lastName}`,
+              firstName: application.userId.firstName,
+              lastName: application.userId.lastName,
+              email: application.userId.email,
+              profilePic: application.userId.profilePic,
+              skills: application.userId.skills || [],
+            }
             : null,
           reports,
         };
@@ -555,5 +557,165 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     success: true,
     message: "College interns reports fetched successfully",
     data,
+  });
+});
+
+// ========================== Get College Dashboard ==========================
+export const getCollegeDashboard = asyncHandler(async (req, res, next) => {
+  const collegeId = req.college?._id;
+
+  const college = await collegeModel.findById(collegeId);
+  if (!college) {
+    return next(new Error("College not found", { cause: 404 }));
+  }
+
+  // ================================
+  // STEP 1: Get internships scope
+  // ================================
+  const approvedInternships = await internshipApprovalModel
+    .find({
+      universityId: collegeId,
+      status: "approved",
+    })
+    .select("internshipId")
+    .lean();
+
+  const internshipIds = approvedInternships.map((i) => i.internshipId);
+
+  // لو مفيش internships
+  if (!internshipIds.length) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalApplicants: 0,
+          totalCompletedTrainees: 0,
+          acceptanceRate: 0,
+        },
+        verificationStatus: {
+          isVerified: college.isVerified,
+          approvedByAdmin: college.approvedByAdmin,
+          validUntil: college.validUntil || null,
+        },
+        ongoingInternships: [],
+        academicPartners: [],
+      },
+    });
+  }
+
+  // ================================
+  // STEP 2: SINGLE AGGREGATION (applications)
+  // ================================
+  const statsAgg = await applicationModel.aggregate([
+    {
+      $match: {
+        internshipId: { $in: internshipIds },
+      },
+    },
+
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+
+        accepted: [
+          { $match: { "timeline.status": appStatus.accepted } },
+          { $count: "count" },
+        ],
+      },
+    },
+  ]);
+
+  const totalApplications = statsAgg[0]?.total[0]?.count || 0;
+  const acceptedApplications = statsAgg[0]?.accepted[0]?.count || 0;
+
+  const acceptanceRate =
+    totalApplications === 0
+      ? 0
+      : Math.round((acceptedApplications / totalApplications) * 100);
+
+  // ================================
+  // STEP 3: Completed Trainees (1 query)
+  // ================================
+  const totalCompletedTrainees = await internshipModel.countDocuments({
+    _id: { $in: internshipIds },
+    status: internshipStatus.completed,
+  });
+
+  // ================================
+  // STEP 4: Ongoing Internships (lean + populate)
+  // ================================
+  const ongoingInternships = await internshipModel
+    .find({
+      _id: { $in: internshipIds },
+      status: { $ne: internshipStatus.completed },
+    })
+    .populate("companyId", "companyName logo industry")
+    .lean();
+
+  // ================================
+  // STEP 5: Academic Partners (unique companies)
+  // ================================
+  const companyIds = [
+    ...new Set(ongoingInternships.map((i) => i.companyId?._id)),
+  ];
+
+  const academicPartners = await companyModel
+    .find({
+      _id: { $in: companyIds },
+      deletedAt: { $exists: false },
+    })
+    .select("companyName logo industry")
+    .lean();
+
+
+  // ================================
+  // STEP 6: number of applicants per internship 
+  // ================================
+  const applicantsPerInternship = await applicationModel.aggregate([
+    {
+      $match: {
+        internshipId: { $in: internshipIds },
+      },
+    },
+    {
+      $group: {
+        _id: "$internshipId",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const applicantsMap = new Map(
+    applicantsPerInternship.map((i) => [i._id.toString(), i.count]),
+  );
+
+  // ================================
+  // STEP 7: RESPONSE
+  // ================================
+  return res.status(200).json({
+    success: true,
+    data: {
+      stats: {
+        totalApplicants: totalApplications,
+        totalCompletedTrainees,
+        acceptanceRate,
+      },
+
+      verificationStatus: {
+        isVerified: college.isVerified,
+        approvedByAdmin: college.approvedByAdmin,
+        validUntil: college.validUntil || null,
+      },
+
+      ongoingInternships: ongoingInternships.map((i) => ({
+        id: i._id,
+        title: i.internshipTittle,
+        status: i.status,
+        company: i.companyId,
+        applicantsCount: applicantsMap.get(i._id.toString()) || 0,
+      })),
+
+      academicPartners,
+    },
   });
 });
