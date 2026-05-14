@@ -124,7 +124,7 @@ collegeRouter.get(
 );
 
 collegeRouter.get(
-  "/:collegeId/partners",
+  "/partners",
   auth([roles.college]),
   validation(CV.getCollegePartnersSchema),
   CS.getCollegePartners,

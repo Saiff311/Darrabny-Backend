@@ -113,9 +113,6 @@ export const respondToEndorsementRequestSchema = joi.object({
 })
 
 export const getCollegePartnersSchema = {
-    params: joi.object({
-        collegeId: generalRules.id.required(),
-    }),
     query: joi.object({
         page: joi.number().integer().min(1).optional(),
         limit: joi.number().integer().min(1).max(100).optional(),

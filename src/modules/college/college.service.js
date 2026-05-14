@@ -906,17 +906,18 @@ export const getCollegeDashboard = asyncHandler(async (req, res, next) => {
 
 // ========================= Get College Partners =========================
 export const getCollegePartners = asyncHandler(async (req, res, next) => {
-  const { collegeId } = req.params;
-  const authCollegeId = req.college?._id;
+  // 1. استخراج الـ ID الخاص بالكلية من التوكن
+  const collegeId = req.college?._id;
 
-  if (authCollegeId && String(authCollegeId) !== String(collegeId)) {
+  if (!collegeId) {
     return next(
-      new Error("You are not authorized to access this college", {
-        cause: 403,
+      new Error("College authentication required", {
+        cause: 401,
       }),
     );
   }
 
+  // 2. تجهيز الـ Pagination
   const page = Number.parseInt(req.query.page, 10) || 1;
   const limit = Number.parseInt(req.query.limit, 10) || 10;
 
@@ -924,6 +925,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
   const safeLimit = limit > 0 ? limit : 10;
   const skip = (safePage - 1) * safeLimit;
 
+  // 3. جلب معرفات الشركات (الشركاء) من جدول الشراكات بناءً على الكلية
   const partnerships = await partnershipModel
     .find({ universityId: collegeId })
     .select("companyId")
@@ -933,6 +935,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
     .map((item) => item.companyId)
     .filter(Boolean);
 
+  // لو مفيش أي شركاء، نرجع مصفوفة فاضية
   if (!partnerCompanyIds.length) {
     return res.status(200).json({
       success: true,
@@ -947,6 +950,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // 4. تجهيز الفلاتر (البحث، الصناعة، الموقع)
   const { search, industry, location } = req.query;
   const companyQuery = {
     _id: { $in: partnerCompanyIds },
@@ -974,6 +978,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
     };
   }
 
+  // 5. حساب العدد الإجمالي للشركات (عشان الـ Pagination)
   const totalCompanies = await companyModel.countDocuments(companyQuery);
 
   if (!totalCompanies) {
@@ -990,6 +995,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // 6. جلب بيانات الشركات بالعدد والصفحة المطلوبة
   const companies = await companyModel
     .find(companyQuery)
     .select("companyName logo industry address")
@@ -1000,6 +1006,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
 
   const companyIdsPage = companies.map((company) => company._id);
 
+  // 7. جلب التقييمات للشركات دي وحساب المتوسط
   const ratingsAgg = await internshipReportModel.aggregate([
     {
       $match: {
@@ -1035,6 +1042,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
     ratingsAgg.map((item) => [item._id.toString(), item]),
   );
 
+  // 8. تجميع البيانات النهائية
   const data = companies.map((company) => {
     const ratingInfo = ratingsMap.get(company._id.toString()) || {};
     const rating = ratingInfo.avgRating
@@ -1051,7 +1059,7 @@ export const getCollegePartners = asyncHandler(async (req, res, next) => {
       isTopPartner: rating >= 4.5 && reviewCount > 50,
       industry: company.industry || null,
       location: company.address || null,
-      coreCompetencies: [],
+      coreCompetencies: [], // تقدر تملاها بعدين لو ليها موديل خاص أو موجودة جوه الـ company
     };
   });
 
