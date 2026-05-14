@@ -9,7 +9,7 @@ import { getTimeAgo } from "../../utils/local-functions/timeAgo.js";
 
 const internshipSchema = new mongoose.Schema(
   {
-    internshipTittle: {
+    internshipTitle: {
       type: String,
       required: true,
       trim: true,

@@ -127,7 +127,7 @@ export const getCompany = asyncHandler(async (req, res, next) => {
       companyId,
       deletedAt: { $exists: false },
     })
-    .select("internshipTittle location internshipType createdAt")
+    .select("internshipTitle location internshipType createdAt")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -436,7 +436,7 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
   // Get company internships
   const internships = await internshipModel
     .find({ companyId })
-    .select("_id internshipTittle");
+    .select("_id internshipTitle");
 
   const internshipIds = internships.map((i) => i._id);
 
@@ -455,7 +455,7 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
     .sort(sortOption)
     .skip(skip)
     .limit(Number(limit))
-    .populate("internshipId", "internshipTittle")
+    .populate("internshipId", "internshipTitle")
     .populate("userId", "fullName email university");
 
   const totalItems = await applicationModel.countDocuments(filter);
@@ -465,7 +465,7 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
     applicationId: app._id,
     internship: {
       id: app.internshipId?._id,
-      title: app.internshipId?.internshipTittle,
+      title: app.internshipId?.internshipTitle,
     },
     student: {
       id: app.userId?._id,
@@ -787,7 +787,7 @@ export const getFeaturedCompanies = asyncHandler(
 
         const daysSinceLastActivity = lastInternship
           ? (Date.now() - lastInternship.createdAt) /
-            (1000 * 60 * 60 * 24)
+          (1000 * 60 * 60 * 24)
           : 999;
 
         const recentActivityScore = Math.max(
@@ -904,7 +904,7 @@ export const getCompanyInternships = asyncHandler(
         deletedAt: { $exists: false },
       })
       .select(
-        "internshipTittle location internshipType createdAt"
+        "internshipTitle location internshipType createdAt"
       )
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1035,4 +1035,199 @@ export const getCompanyReviews = asyncHandler(
       })),
     });
   }
+);
+
+// ========================= Get My Company Profile =========================
+export const getMyCompanyProfile = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+
+    // ========================= Company =========================
+    const company = await companyModel
+      .findOne({
+        _id: companyId,
+        deletedAt: { $exists: false },
+      })
+      .select(`
+        companyName
+        email
+        companyPhone
+        description
+        industry
+        address
+        logo
+        coverPic
+        numberOfEmployees
+        rating
+        totalReviews
+        verificationStatus
+        createdAt
+      `);
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    // ========================= Internships =========================
+    const internships = await internshipModel
+      .find({
+        companyId,
+        deletedAt: { $exists: false },
+      })
+      .select(`
+        internshipTitle
+        internshipLocation
+        workingTime
+        status
+        createdAt
+        startDate
+        endDate
+        technicalSkills
+      `)
+      .sort({ createdAt: -1 });
+
+    // ========================= Applications Stats =========================
+    const internshipIds = internships.map((i) => i._id);
+
+    const totalApplications = await applicationModel.countDocuments({
+      internshipId: { $in: internshipIds },
+    });
+
+    // ========================= Reviews =========================
+    const reviews = await companyReviewModel
+      .find({
+        companyId,
+      })
+      .populate("userId", "fullName profilePic")
+      .sort({ createdAt: -1 });
+
+    // ========================= Stats =========================
+    const activeInternships = internships.length;
+
+    // ========================= Response =========================
+    return res.status(200).json({
+      success: true,
+
+      company: {
+        ...company.toObject(),
+
+        stats: {
+          activeInternships,
+          totalApplications,
+          rating: company.rating,
+          totalReviews: company.totalReviews,
+        },
+      },
+
+      internships,
+
+      reviews: reviews.map((review) => ({
+        id: review._id,
+
+        user: {
+          id: review.userId?._id,
+          fullName: review.userId?.fullName,
+          profilePic: review.userId?.profilePic,
+        },
+
+        rating: review.rating,
+
+        comment: review.comment,
+
+        createdAt: review.createdAt,
+      })),
+    });
+  },
+);
+
+// ========================= Update My Company Profile =========================
+export const updateMyCompanyProfile = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+
+    const {
+      companyName,
+      description,
+      industry,
+      address,
+      companyPhone,
+      numberOfEmployees,
+    } = req.body;
+
+    const company = await companyModel.findOne({
+      _id: companyId,
+      deletedAt: { $exists: false },
+    });
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    if (company.bannedAt) {
+      return next(new Error("Company is banned", { cause: 403 }));
+    }
+
+    // unique company name
+    if (
+      companyName &&
+      companyName !== company.companyName
+    ) {
+      const exists = await companyModel.findOne({
+        companyName,
+        _id: { $ne: companyId },
+      });
+
+      if (exists) {
+        return next(
+          new Error("Company name already exists", {
+            cause: 409,
+          }),
+        );
+      }
+
+      company.companyName = companyName;
+    }
+
+    // unique phone
+    if (
+      companyPhone &&
+      companyPhone !== company.companyPhone
+    ) {
+      const exists = await companyModel.findOne({
+        companyPhone,
+        _id: { $ne: companyId },
+      });
+
+      if (exists) {
+        return next(
+          new Error("Phone number already exists", {
+            cause: 409,
+          }),
+        );
+      }
+
+      company.companyPhone = companyPhone;
+    }
+
+    // update optional fields
+    if (description !== undefined)
+      company.description = description;
+
+    if (industry !== undefined)
+      company.industry = industry;
+
+    if (address !== undefined)
+      company.address = address;
+
+    if (numberOfEmployees !== undefined)
+      company.numberOfEmployees = numberOfEmployees;
+
+    await company.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Company profile updated successfully",
+      company,
+    });
+  },
 );
