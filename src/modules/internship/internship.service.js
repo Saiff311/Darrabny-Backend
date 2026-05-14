@@ -717,7 +717,7 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
   const internship = await internshipModel
     .findById(internshipId)
     .select(
-      "status closed companyId internshipTittle technicalSkills internshipDescription",
+      "status closed companyId internshipTitle technicalSkills internshipDescription",
     );
 
   if (!internship) {
@@ -814,7 +814,7 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
         university: student.university,
       },
       {
-        internshipTittle: internship.internshipTittle,
+        internshipTitle: internship.internshipTitle,
         technicalSkills: internship.technicalSkills,
         internshipDescription: internship.internshipDescription,
       },

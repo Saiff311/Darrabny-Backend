@@ -9,163 +9,164 @@ import { appStatus } from "../../utils/enums.js";
 import mongoose from "mongoose";
 
 //--------------------------------Etoo--------------------------------------------------------
-export const UpdateAccount = asyncHandler( async (req, res, next)=>{
-    //update account via this way so the encryption hook works (doesn't work with updateOne())
-    const { fullName, email, mobileNumber, address } = req.body;
+export const UpdateAccount = asyncHandler(async (req, res, next) => {
+  //update account via this way so the encryption hook works (doesn't work with updateOne())
+  const { fullName, email, mobileNumber, address } = req.body;
 
-    const user = await userModel.findById(req.user._id);
-    
-    if (fullName) {
-        const nameParts = fullName.trim().split(" ");
-        user.firstName = nameParts.shift();
-        user.lastName = nameParts.join(" ");
-    }
+  const user = await userModel.findById(req.user._id);
 
-    if (email) {
-        user.email = email;
-    }
+  if (fullName) {
+    const nameParts = fullName.trim().split(" ");
+    user.firstName = nameParts.shift();
+    user.lastName = nameParts.join(" ");
+  }
 
-    if (mobileNumber) {
-        user.mobileNumber = mobileNumber;
-    }
+  if (email) {
+    user.email = email;
+  }
 
-    if (address && typeof address === "object") {
-        user.address = {
-        country: address.country ?? user.address?.country,
-        city: address.city ?? user.address?.city,
-        };
-    }
+  if (mobileNumber) {
+    user.mobileNumber = mobileNumber;
+  }
 
-    await user.save();
+  if (address && typeof address === "object") {
+    user.address = {
+      country: address.country ?? user.address?.country,
+      city: address.city ?? user.address?.city,
+    };
+  }
 
-    return res.status(200).json({
-        msg: "User account updated successfully",
-        user
-    });
+  await user.save();
+
+  return res.status(200).json({
+    msg: "User account updated successfully",
+    user
+  });
 })
 // --------------------------------------Etoo--------------------------------------------------------
-export const getLoginUser = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    //decrypt mobile number
-    user.mobileNumber = await decrypt(user.mobileNumber)
-    return res.status(200).json({msg: "My Profile",
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phoneNumber: user.mobileNumber,
-        address: user.address,
-        notifications:{
-            "email": true,
-            "push": true
-        }
-    }) 
+export const getLoginUser = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  //decrypt mobile number
+  user.mobileNumber = await decrypt(user.mobileNumber)
+  return res.status(200).json({
+    msg: "My Profile",
+    id: user._id,
+    fullName: user.fullName,
+    email: user.email,
+    phoneNumber: user.mobileNumber,
+    address: user.address,
+    notifications: {
+      "email": true,
+      "push": true
+    }
+  })
 })
 // --------------------------------------Etoo--------------------------------------------------------
-export const myNotifications = asyncHandler( async (req, res, next)=>{
-    const {email, push} = req.body
-    const user = await userModel.findById(req.user._id)
-    user.notifications = {email, push}
-    await user.save()
-    return res.status(200).json({msg: "Notifications updated successfully", notifications: user.notifications}) 
+export const myNotifications = asyncHandler(async (req, res, next) => {
+  const { email, push } = req.body
+  const user = await userModel.findById(req.user._id)
+  user.notifications = { email, push }
+  await user.save()
+  return res.status(200).json({ msg: "Notifications updated successfully", notifications: user.notifications })
 })
 
-export const getAnotherUser = asyncHandler( async (req, res, next)=>{
-    const {id} = req.params
-    //U should select first & last name so the userName appears!
-    const doc = await userModel.findById(id).select("firstName lastName mobileNumber profilePic coverPic")
-    //show user name
-    const user = doc.toObject({virtuals: true})
-    if (!user) {
-        return res.status(404).json({ msg: "User not found" });
-    }
-    //decrypt mobile number
-    user.mobileNumber = await decrypt(user.mobileNumber)
-    return res.status(200).json({msg: "My Profile", user}) 
+export const getAnotherUser = asyncHandler(async (req, res, next) => {
+  const { id } = req.params
+  //U should select first & last name so the userName appears!
+  const doc = await userModel.findById(id).select("firstName lastName mobileNumber profilePic coverPic")
+  //show user name
+  const user = doc.toObject({ virtuals: true })
+  if (!user) {
+    return res.status(404).json({ msg: "User not found" });
+  }
+  //decrypt mobile number
+  user.mobileNumber = await decrypt(user.mobileNumber)
+  return res.status(200).json({ msg: "My Profile", user })
 })
 
-export const updatePassword = asyncHandler( async (req, res, next)=>{
-    const {oldPassword, newPassword} = req.body
-    if(! await compare(oldPassword, req.user.password)){
-        return next(new Error("Invalid old password", {cause: 400}))
-    }
-    //update password via this way so the hashing hook works (doesn't work with updateOne())
-    const user = await userModel.findById(req.user._id);
-    user.password = newPassword;
-    user.changePassword = Date.now()
-    await user.save(); // 
-    return res.status(200).json({msg: "Password updated successfully"})
+export const updatePassword = asyncHandler(async (req, res, next) => {
+  const { oldPassword, newPassword } = req.body
+  if (! await compare(oldPassword, req.user.password)) {
+    return next(new Error("Invalid old password", { cause: 400 }))
+  }
+  //update password via this way so the hashing hook works (doesn't work with updateOne())
+  const user = await userModel.findById(req.user._id);
+  user.password = newPassword;
+  user.changePassword = Date.now()
+  await user.save(); // 
+  return res.status(200).json({ msg: "Password updated successfully" })
 })
 
-export const UploadProfilePic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    //delete old profile pic
-    if(user.profilePic.public_id){
-        await cloudinary.uploader.destroy(user.profilePic.public_id)
-    }
-    //upload profile pic to cloudinary
-    const {secure_url, public_id} = await cloudinary.uploader.upload(req.file.path, {
-        folder: "profile pics"
-    })
-    console.log("file:" + req.file);
-    
-    const profilePic = {secure_url, public_id}
-    await userModel.updateOne({_id: req.user._id}, {profilePic})
-    return res.status(200).json({msg: "Profile Pic uploaded successfully"})
+export const UploadProfilePic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  //delete old profile pic
+  if (user.profilePic.public_id) {
+    await cloudinary.uploader.destroy(user.profilePic.public_id)
+  }
+  //upload profile pic to cloudinary
+  const { secure_url, public_id } = await cloudinary.uploader.upload(req.file.path, {
+    folder: "profile pics"
+  })
+  console.log("file:" + req.file);
+
+  const profilePic = { secure_url, public_id }
+  await userModel.updateOne({ _id: req.user._id }, { profilePic })
+  return res.status(200).json({ msg: "Profile Pic uploaded successfully" })
 })
 
-export const UploadCoverPic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    //delete old profile pic
-    if(user.coverPic.public_id){
-        await cloudinary.uploader.destroy(user.coverPic.public_id)
-    }
-    //upload profile pic to cloudinary
-    const {secure_url, public_id} = await cloudinary.uploader.upload(req.file.path, {
-        folder: "cover pics"
-    })
-    const coverPic = {secure_url, public_id}
-    await userModel.updateOne({_id: req.user._id}, {coverPic})
-    return res.status(200).json({msg: "Cover Pic uploaded successfully"})
+export const UploadCoverPic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  //delete old profile pic
+  if (user.coverPic.public_id) {
+    await cloudinary.uploader.destroy(user.coverPic.public_id)
+  }
+  //upload profile pic to cloudinary
+  const { secure_url, public_id } = await cloudinary.uploader.upload(req.file.path, {
+    folder: "cover pics"
+  })
+  const coverPic = { secure_url, public_id }
+  await userModel.updateOne({ _id: req.user._id }, { coverPic })
+  return res.status(200).json({ msg: "Cover Pic uploaded successfully" })
 })
 
-export const deleteProfilePic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    if (!user.profilePic.public_id) {
-        return next(new Error("Profile picture not found!", { cause: 404 }));
-    }
-    // Delete the image from Cloudinary
-    const result = await cloudinary.uploader.destroy( user.profilePic.public_id);    
-    if (result.result !== "ok") {
-        return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
-    }
-    await userModel.updateOne({_id: req.user._id}, {$unset: {profilePic:""}})
-    return res.status(200).json({msg: "Profile Pic deleted successfully"})
+export const deleteProfilePic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  if (!user.profilePic.public_id) {
+    return next(new Error("Profile picture not found!", { cause: 404 }));
+  }
+  // Delete the image from Cloudinary
+  const result = await cloudinary.uploader.destroy(user.profilePic.public_id);
+  if (result.result !== "ok") {
+    return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
+  }
+  await userModel.updateOne({ _id: req.user._id }, { $unset: { profilePic: "" } })
+  return res.status(200).json({ msg: "Profile Pic deleted successfully" })
 })
 
-export const deleteCoverPic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    if (!user.coverPic.public_id) {
-        return next(new Error("Cover picture not found!", { cause: 404 }));
-    }
-    // Delete the image from Cloudinary
-    const result = await cloudinary.uploader.destroy(user.coverPic.public_id);
-    if (result.result !== "ok") {
-        return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
-    }
-    await userModel.updateOne({_id: req.user._id}, {$unset: {coverPic:""}})
-    return res.status(200).json({msg: "Cover Pic deleted successfully"})
+export const deleteCoverPic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  if (!user.coverPic.public_id) {
+    return next(new Error("Cover picture not found!", { cause: 404 }));
+  }
+  // Delete the image from Cloudinary
+  const result = await cloudinary.uploader.destroy(user.coverPic.public_id);
+  if (result.result !== "ok") {
+    return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
+  }
+  await userModel.updateOne({ _id: req.user._id }, { $unset: { coverPic: "" } })
+  return res.status(200).json({ msg: "Cover Pic deleted successfully" })
 })
 
 export const softDelete = asyncHandler(async (req, res, next) => {
-    
-    await userModel.updateOne({_id: req.user._id}, {isDeleted: true, deletedAt: Date.now()})
 
-    return res.status(200).json({ msg: "Account Deleted Successfully", });
+  await userModel.updateOne({ _id: req.user._id }, { isDeleted: true, deletedAt: Date.now() })
+
+  return res.status(200).json({ msg: "Account Deleted Successfully", });
 });
 
 // export const saveInternship = asyncHandler(async(req,res,next)=>{})
 
- export const GetStudentDashboard = asyncHandler(
+export const GetStudentDashboard = asyncHandler(
   async (req, res, next) => {
 
     const studentId = req.user._id;
@@ -186,7 +187,7 @@ export const softDelete = asyncHandler(async (req, res, next) => {
 
     const activeInternships = activeInternshipsRaw.map((i) => ({
       id: i._id,
-      title: i.internshipTittle,
+      title: i.internshipTitle,
       company: {
         id: i.companyId?._id,
         name: i.companyId?.name
@@ -197,7 +198,7 @@ export const softDelete = asyncHandler(async (req, res, next) => {
       salary: i.salary || 0,
       salaryType: i.salaryType || "month",
       thumbnail: i.thumbnail || "",
-      progress: 0 
+      progress: 0
     }));
 
 
@@ -215,7 +216,7 @@ export const softDelete = asyncHandler(async (req, res, next) => {
 
     const savedInternships = (user?.savedInternships || []).map((s) => ({
       id: s._id,
-      title: s.internshipTittle,
+      title: s.internshipTitle,
       company: {
         id: s.companyId?._id,
         name: s.companyId?.name
@@ -359,7 +360,7 @@ export const GetStudentApplications = asyncHandler(async (req, res, next) => {
             id: "$_id",
             internship: {
               id: "$internship._id",
-              title: "$internship.internshipTittle",
+              title: "$internship.internshipTitle",
               company: {
                 id: "$company._id",
                 name: "$company.name"

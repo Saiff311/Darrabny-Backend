@@ -25,9 +25,9 @@ export const getPendingPartnerships = asyncHandler(async (req, res, next) => {
       const company = p.companyId || null;
       const availableInternships = company
         ? await internshipModel
-            .find({ companyId: company._id, deletedAt: { $exists: false } })
-            .select("internshipTittle startDate endDate status")
-            .lean()
+          .find({ companyId: company._id, deletedAt: { $exists: false } })
+          .select("internshipTitle startDate endDate status")
+          .lean()
         : [];
 
       return {

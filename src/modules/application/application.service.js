@@ -152,7 +152,7 @@ export const getApplicationDetails = asyncHandler(async (req, res, next) => {
   const application = await applicationModel
     .findById(id)
     .populate("userId", "firstName lastName email profilePic bio links")
-    .populate("internshipId", "internshipTittle");
+    .populate("internshipId", "internshipTitle");
 
   if (!application) {
     return next(new Error("Application not found", { cause: 404 }));

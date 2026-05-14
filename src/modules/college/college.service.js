@@ -387,7 +387,7 @@ export const getPendingEndorsements = asyncHandler(async (req, res, next) => {
     .populate({
       path: "internshipId",
       select:
-        "internshipTittle internshipDescription internshipLocation workingTime technicalSkills softSkills startDate endDate durationInMonths thumbnail status",
+        "internshipTitle internshipDescription internshipLocation workingTime technicalSkills softSkills startDate endDate durationInMonths thumbnail status",
     })
     .sort({ createdAt: -1 })
     .lean();
@@ -466,7 +466,7 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     .populate({
       path: "internshipId",
       select:
-        "internshipTittle internshipDescription internshipLocation workingTime technicalSkills softSkills startDate endDate durationInMonths thumbnail status companyId",
+        "internshipTitle internshipDescription internshipLocation workingTime technicalSkills softSkills startDate endDate durationInMonths thumbnail status companyId",
     });
 
   if (!approvedInternships.length) {
@@ -543,84 +543,84 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     .lean();
 
   log("=== TOTAL REPORTS ===", reports.length);
-    console.log(reports);
-    
+  console.log(reports);
+
   // =========================
   // 4. INDEX REPORTS BY INTERNSHIP
   // =========================
- const reportsByInternship = new Map();
+  const reportsByInternship = new Map();
 
-console.log("\n==============================");
-console.log("=== START GROUPING REPORTS ===");
-console.log("==============================\n");
+  console.log("\n==============================");
+  console.log("=== START GROUPING REPORTS ===");
+  console.log("==============================\n");
 
-for (const [index, report] of reports.entries()) {
-  console.log("\n--------------------------------");
-  console.log(`REPORT #${index + 1}`);
-  console.log("--------------------------------");
+  for (const [index, report] of reports.entries()) {
+    console.log("\n--------------------------------");
+    console.log(`REPORT #${index + 1}`);
+    console.log("--------------------------------");
 
-  console.log("RAW REPORT:");
-  console.log(report);
+    console.log("RAW REPORT:");
+    console.log(report);
 
-  const internshipIdStr = report.internshipId?.toString();
+    const internshipIdStr = report.internshipId?.toString();
 
-  console.log("EXTRACTED internshipId:");
-  console.log({
-    raw: report.internshipId,
-    normalized: internshipIdStr,
-  });
+    console.log("EXTRACTED internshipId:");
+    console.log({
+      raw: report.internshipId,
+      normalized: internshipIdStr,
+    });
 
-  if (!internshipIdStr) {
-    console.log("❌ SKIPPED REPORT - NO internshipId");
-    continue;
+    if (!internshipIdStr) {
+      console.log("❌ SKIPPED REPORT - NO internshipId");
+      continue;
+    }
+
+    const existsBefore = reportsByInternship.has(internshipIdStr);
+
+    console.log("MAP STATE BEFORE INSERT:");
+    console.log({
+      internshipId: internshipIdStr,
+      alreadyExists: existsBefore,
+      currentMapSize: reportsByInternship.size,
+    });
+
+    if (!existsBefore) {
+      console.log("🆕 Creating new array for this internship");
+      reportsByInternship.set(internshipIdStr, []);
+    }
+
+    reportsByInternship.get(internshipIdStr).push(report);
+
+    console.log("✅ REPORT ADDED");
+
+    console.log("MAP STATE AFTER INSERT:");
+    console.log(
+      Array.from(reportsByInternship.entries()).map(([key, value]) => ({
+        internshipId: key,
+        reportsCount: value.length,
+      }))
+    );
   }
 
-  const existsBefore = reportsByInternship.has(internshipIdStr);
+  console.log("\n==============================");
+  console.log("=== FINAL GROUPED RESULT ===");
+  console.log("==============================");
 
-  console.log("MAP STATE BEFORE INSERT:");
-  console.log({
-    internshipId: internshipIdStr,
-    alreadyExists: existsBefore,
-    currentMapSize: reportsByInternship.size,
-  });
+  for (const [key, value] of reportsByInternship.entries()) {
+    console.log("\nINTERN-SHIP GROUP:");
+    console.log("internshipId:", key);
+    console.log("reportsCount:", value.length);
 
-  if (!existsBefore) {
-    console.log("🆕 Creating new array for this internship");
-    reportsByInternship.set(internshipIdStr, []);
+    console.log("reports preview:");
+    console.log(
+      value.map((r) => ({
+        id: r._id,
+        internshipId: r.internshipId,
+        studentId: r.studentId,
+        title: r.title,
+      }))
+    );
   }
-
-  reportsByInternship.get(internshipIdStr).push(report);
-
-  console.log("✅ REPORT ADDED");
-
-  console.log("MAP STATE AFTER INSERT:");
-  console.log(
-    Array.from(reportsByInternship.entries()).map(([key, value]) => ({
-      internshipId: key,
-      reportsCount: value.length,
-    }))
-  );
-}
-
-console.log("\n==============================");
-console.log("=== FINAL GROUPED RESULT ===");
-console.log("==============================");
-
-for (const [key, value] of reportsByInternship.entries()) {
-  console.log("\nINTERN-SHIP GROUP:");
-  console.log("internshipId:", key);
-  console.log("reportsCount:", value.length);
-
-  console.log("reports preview:");
-  console.log(
-    value.map((r) => ({
-      id: r._id,
-      internshipId: r.internshipId,
-      studentId: r.studentId,
-      title: r.title,
-    }))
-  );
-}
 
   // =========================
   // 5. BUILD RESPONSE
@@ -678,14 +678,14 @@ for (const [key, value] of reportsByInternship.entries()) {
 
           student: application.userId
             ? {
-                id: studentIdStr,
-                fullName: `${application.userId.firstName} ${application.userId.lastName}`,
-                firstName: application.userId.firstName,
-                lastName: application.userId.lastName,
-                email: application.userId.email,
-                profilePic: application.userId.profilePic,
-                skills: application.userId.skills || [],
-              }
+              id: studentIdStr,
+              fullName: `${application.userId.firstName} ${application.userId.lastName}`,
+              firstName: application.userId.firstName,
+              lastName: application.userId.lastName,
+              email: application.userId.email,
+              profilePic: application.userId.profilePic,
+              skills: application.userId.skills || [],
+            }
             : null,
 
           reports,
@@ -697,7 +697,7 @@ for (const [key, value] of reportsByInternship.entries()) {
       return {
         internship: {
           id: internship._id,
-          title: internship.internshipTittle,
+          title: internship.internshipTitle,
           description: internship.internshipDescription,
           location: internship.internshipLocation,
           workingTime: internship.workingTime,
@@ -874,7 +874,7 @@ export const getCollegeDashboard = asyncHandler(async (req, res, next) => {
 
       ongoingInternships: ongoingInternships.map((i) => ({
         id: i._id,
-        title: i.internshipTittle,
+        title: i.internshipTitle,
         status: i.status,
         company: i.companyId,
         applicantsCount: applicantsMap.get(i._id.toString()) || 0,

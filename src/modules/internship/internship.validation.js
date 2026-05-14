@@ -9,7 +9,7 @@ import {
 
 // ========================== Add Internship ==========================
 export const addInternshipSchema = Joi.object({
-  internshipTittle: Joi.string().trim().required(),   // ✅ internshipTitle
+  internshipTitle: Joi.string().trim().required(),   // ✅ internshipTitle
 
   internshipLocation: Joi.string()
     .valid(...Object.values(internshipLocations))
@@ -47,7 +47,7 @@ export const addInternshipSchema = Joi.object({
 
 // ========================== Update Internship ==========================
 export const updateInternshipSchema = Joi.object({
-  internshipTittle: Joi.string().trim().optional(),
+  internshipTitle: Joi.string().trim().optional(),
 
   internshipLocation: Joi.string()
     .valid(...Object.values(internshipLocations))
@@ -64,13 +64,13 @@ export const updateInternshipSchema = Joi.object({
   softSkills: Joi.array().items(Joi.string()).min(1).optional(),
 
   // ✅ الحقول اللي ضفناها عشان Joi ميطردش الـ Request
-  durationInMonths: Joi.number().optional(), 
+  durationInMonths: Joi.number().optional(),
   seniorityLevel: Joi.string().optional(),
   startDate: Joi.date().optional(), // أو Joi.string() لو بتخزنها كنص
 
   closed: Joi.boolean().optional(),
-  
-  internshipId: generalRules.id.required(), 
+
+  internshipId: generalRules.id.required(),
 });
 
 // ========================== Response Application ==========================

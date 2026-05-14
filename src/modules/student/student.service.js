@@ -100,7 +100,7 @@ export const getStudentProfile = asyncHandler(async (req, res, next) => {
     .populate({
       path: "internshipId",
       select:
-        "internshipTittle startDate endDate durationInMonths internshipLocation companyId",
+        "internshipTitle startDate endDate durationInMonths internshipLocation companyId",
       populate: {
         path: "companyId",
         select: "companyName address",
@@ -119,7 +119,7 @@ export const getStudentProfile = asyncHandler(async (req, res, next) => {
       const startDate = internship.startDate || null;
       const endDate = internship.endDate || null;
       const roleTitle =
-        internship.internshipTittle ||
+        internship.internshipTitle ||
         internship.internshipTitle ||
         internship.title ||
         null;
@@ -420,7 +420,7 @@ export const uploadResume = asyncHandler(async (req, res, next) => {
     // format: "pdf",
     public_id: `resumes/${Date.now()}.pdf`, // force .pdf in the ID
     overwrite: true,
-    access_mode: "public"  
+    access_mode: "public"
   });
 
   student.resume = {
@@ -429,14 +429,14 @@ export const uploadResume = asyncHandler(async (req, res, next) => {
   };
   await student.save();
 
- const downloadUrl = cloudinary.utils.private_download_url(
-  student.resume.public_id,
-  "pdf",
-  {
-    resource_type: "raw",
-    expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour expiry
-  }
-);
+  const downloadUrl = cloudinary.utils.private_download_url(
+    student.resume.public_id,
+    "pdf",
+    {
+      resource_type: "raw",
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour expiry
+    }
+  );
 
   return res.status(200).json({
     fileName: req.file.originalname,
@@ -556,49 +556,49 @@ export const softDelete = asyncHandler(async (req, res, next) => {
 });
 
 // ========================== Upload Cover Pic ==========================
-export const UploadCoverPic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    //delete old profile pic
-    if(user.coverPic.public_id){
-        await cloudinary.uploader.destroy(user.coverPic.public_id)
-    }
-    //upload profile pic to cloudinary
-    const {secure_url, public_id} = await cloudinary.uploader.upload(req.file.path, {
-        folder: "cover pics"
-    })
-    const coverPic = {secure_url, public_id}
-    await userModel.updateOne({_id: req.user._id}, {coverPic})
-    return res.status(200).json({msg: "Cover Pic uploaded successfully"})
+export const UploadCoverPic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  //delete old profile pic
+  if (user.coverPic.public_id) {
+    await cloudinary.uploader.destroy(user.coverPic.public_id)
+  }
+  //upload profile pic to cloudinary
+  const { secure_url, public_id } = await cloudinary.uploader.upload(req.file.path, {
+    folder: "cover pics"
+  })
+  const coverPic = { secure_url, public_id }
+  await userModel.updateOne({ _id: req.user._id }, { coverPic })
+  return res.status(200).json({ msg: "Cover Pic uploaded successfully" })
 })
 
 // ========================== Delete Profile Pic ==========================
-export const deleteProfilePic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    if (!user.profilePic.public_id) {
-        return next(new Error("Profile picture not found!", { cause: 404 }));
-    }
-    // Delete the image from Cloudinary
-    const result = await cloudinary.uploader.destroy( user.profilePic.public_id);    
-    if (result.result !== "ok") {
-        return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
-    }
-    await userModel.updateOne({_id: req.user._id}, {$unset: {profilePic:""}})
-    return res.status(200).json({msg: "Profile Pic deleted successfully"})
+export const deleteProfilePic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  if (!user.profilePic.public_id) {
+    return next(new Error("Profile picture not found!", { cause: 404 }));
+  }
+  // Delete the image from Cloudinary
+  const result = await cloudinary.uploader.destroy(user.profilePic.public_id);
+  if (result.result !== "ok") {
+    return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
+  }
+  await userModel.updateOne({ _id: req.user._id }, { $unset: { profilePic: "" } })
+  return res.status(200).json({ msg: "Profile Pic deleted successfully" })
 })
 
 
 // ========================== Delete Cover Pic ==========================
-export const deleteCoverPic = asyncHandler( async (req, res, next)=>{
-    const user = await userModel.findById(req.user._id)
-    if (!user.coverPic.public_id) {
-        return next(new Error("Cover picture not found!", { cause: 404 }));
-    }
-    // Delete the image from Cloudinary
-    const result = await cloudinary.uploader.destroy(user.coverPic.public_id);
-    if (result.result !== "ok") {
-        return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
-    }
-    await userModel.updateOne({_id: req.user._id}, {$unset: {coverPic:""}})
-    return res.status(200).json({msg: "Cover Pic deleted successfully"})
+export const deleteCoverPic = asyncHandler(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id)
+  if (!user.coverPic.public_id) {
+    return next(new Error("Cover picture not found!", { cause: 404 }));
+  }
+  // Delete the image from Cloudinary
+  const result = await cloudinary.uploader.destroy(user.coverPic.public_id);
+  if (result.result !== "ok") {
+    return next(new Error("Failed to delete image from Cloudinary", { cause: 500 }));
+  }
+  await userModel.updateOne({ _id: req.user._id }, { $unset: { coverPic: "" } })
+  return res.status(200).json({ msg: "Cover Pic deleted successfully" })
 })
 // export const saveInternship = asyncHandler(async(req,res,next)=>{})
