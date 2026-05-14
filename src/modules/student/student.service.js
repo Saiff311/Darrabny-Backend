@@ -5,6 +5,30 @@ import { compare } from "../../utils/security/hashing.js";
 import { decrypt } from "../../utils/security/encryption.js";
 import studentModel from "../../DB/models/student.model.js";
 import internshipReportModel from "../../DB/models/internshipReport.model.js";
+import applicationModel from "../../DB/models/application.model.js";
+
+const formatDuration = (startDate, endDate, durationInMonths) => {
+  if (typeof durationInMonths === "number" && durationInMonths > 0) {
+    return `${durationInMonths} months`;
+  }
+
+  if (!startDate) return null;
+
+  const start = new Date(startDate);
+  const end = endDate ? new Date(endDate) : new Date();
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  let months =
+    (end.getFullYear() - start.getFullYear()) * 12 +
+    (end.getMonth() - start.getMonth());
+
+  if (months <= 0) months = 1;
+
+  return `${months} months`;
+};
 
 // ========================== Update Student Account ==========================
 export const UpdateStudentAccount = asyncHandler(async (req, res, next) => {
@@ -47,6 +71,140 @@ export const getLoginStudent = asyncHandler(async (req, res, next) => {
   user.mobileNumber = await decrypt(user.mobileNumber);
 
   return res.status(200).json({ msg: "My Profile", user });
+});
+
+// ========================== Student Profile ==========================
+export const getStudentProfile = asyncHandler(async (req, res, next) => {
+  const { studentId } = req.params;
+
+  const student = await studentModel
+    .findById(studentId)
+    .populate({
+      path: "userId",
+      select: "firstName lastName skills",
+    })
+    .populate({
+      path: "collegeId",
+      select: "collegeName",
+    })
+    .lean();
+
+  if (!student) return next(new Error("Student not found", { cause: 404 }));
+
+  const user = student.userId || {};
+  const college = student.collegeId || {};
+  const userId = user?._id || student.userId;
+
+  const applications = await applicationModel
+    .find({ userId })
+    .populate({
+      path: "internshipId",
+      select:
+        "internshipTittle startDate endDate durationInMonths internshipLocation companyId",
+      populate: {
+        path: "companyId",
+        select: "companyName address",
+      },
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const now = new Date();
+  const professionalExperience = (applications || [])
+    .map((application) => {
+      const internship = application.internshipId;
+      if (!internship) return null;
+
+      const company = internship.companyId || {};
+      const startDate = internship.startDate || null;
+      const endDate = internship.endDate || null;
+      const roleTitle =
+        internship.internshipTittle ||
+        internship.internshipTitle ||
+        internship.title ||
+        null;
+
+      return {
+        companyName: company.companyName || null,
+        role: roleTitle,
+        startDate,
+        endDate: endDate || null,
+        duration: formatDuration(
+          startDate,
+          endDate,
+          internship.durationInMonths,
+        ),
+        location: company.address || internship.internshipLocation || null,
+        status: endDate && now > new Date(endDate) ? "Completed" : "Ongoing",
+      };
+    })
+    .filter(Boolean);
+
+  const reports = await internshipReportModel
+    .find({ studentId, overallRating: { $ne: null } })
+    .populate({
+      path: "reviewedBy",
+      select: "companyName",
+    })
+    .populate({
+      path: "internshipId",
+      select: "companyId",
+      populate: {
+        path: "companyId",
+        select: "companyName",
+      },
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const companyEvaluations = (reports || []).map((report) => {
+    const company =
+      report.reviewedBy || report.internshipId?.companyId || {};
+
+    return {
+      companyName: company.companyName || null,
+      reviewerName: company.companyName || null,
+      reviewerRole: "Company",
+      rating: report.overallRating,
+      reviewText:
+        report.internalNote ||
+        report.learningOutcomes ||
+        report.keyAchievements ||
+        report.challengesFaced ||
+        null,
+    };
+  });
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      basicInfo: {
+        name: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        major: student.major || null,
+        university: college.collegeName || null,
+        graduationYear:
+          student.graduation_year !== undefined && student.graduation_year !== null
+            ? String(student.graduation_year)
+            : null,
+        gpa:
+          student.CGPA !== undefined && student.CGPA !== null
+            ? String(student.CGPA)
+            : null,
+        cvUrl: student.resume?.secure_url || null,
+      },
+      coreCompetencies: user.skills || [],
+      academicRecord: {
+        institution: college.collegeName || null,
+        major: student.major || null,
+        expectedGraduation:
+          student.graduation_year !== undefined && student.graduation_year !== null
+            ? String(student.graduation_year)
+            : null,
+      },
+      professionalExperience,
+      companyEvaluations,
+    },
+  });
 });
 
 // ========================== Student Reviews ==========================

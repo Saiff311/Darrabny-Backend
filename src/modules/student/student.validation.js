@@ -55,6 +55,12 @@ export const getAnotherUserSchema =  joi.object({
     id : joi.string().length(24).hex().required()
 })
 
+export const getStudentProfileSchema = {
+    params: joi.object({
+        studentId: generalRules.id.required(),
+    }),
+}
+
 export const UploadCoverPicSchema = joi.object({
     file: generalRules.file.required()
 })

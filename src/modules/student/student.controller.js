@@ -93,6 +93,13 @@ StudentRouter.get(
   US.getAnotherUser,
 );
 
+StudentRouter.get(
+  "/profile/:studentId",
+  validation(UV.getStudentProfileSchema),
+  auth(Object.values(roles)),
+  US.getStudentProfile,
+);
+
 StudentRouter.patch(
   "/updatePassword",
   validation(UV.updatePasswordSchema),
