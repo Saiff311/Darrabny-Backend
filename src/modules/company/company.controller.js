@@ -196,4 +196,20 @@ companyRouter.get(
   CS.getCompanyReviews
 );
 
+// ========================= Get My Company Profile =========================
+companyRouter.get(
+  "/me",
+  auth([roles.company]),
+  validation(CV.getMyCompanySchema),
+  CS.getMyCompanyProfile,
+);
+
+// ========================= Update My Company Profile =========================
+companyRouter.patch(
+  "/me",
+  auth([roles.company]),
+  validation(CV.updateMyCompanySchema),
+  CS.updateMyCompanyProfile,
+);
+
 export default companyRouter;

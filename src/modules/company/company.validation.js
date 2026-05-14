@@ -200,3 +200,29 @@ export const addCompanyReviewSchema = joi.object({
 export const getCompanyReviewsSchema = joi.object({
   companyId: generalRules.id.required(),
 });
+
+// ========================= Get My Company =========================
+export const getMyCompanySchema = joi.object({});
+
+// ========================= Update My Company =========================
+export const updateMyCompanySchema = joi
+  .object({
+    companyName: joi.string().trim().min(2).max(60),
+
+    description: joi.string().trim().min(10),
+
+    industry: joi.string().trim(),
+
+    address: joi.string().trim(),
+
+    companyPhone: joi
+      .string()
+      .trim()
+      .pattern(/^[0-9+\-\s]{7,20}$/),
+
+    numberOfEmployees: joi.object({
+      from: joi.number().min(1),
+      to: joi.number().min(1),
+    }),
+  })
+  .min(1);

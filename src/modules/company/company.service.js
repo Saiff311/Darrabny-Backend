@@ -787,7 +787,7 @@ export const getFeaturedCompanies = asyncHandler(
 
         const daysSinceLastActivity = lastInternship
           ? (Date.now() - lastInternship.createdAt) /
-            (1000 * 60 * 60 * 24)
+          (1000 * 60 * 60 * 24)
           : 999;
 
         const recentActivityScore = Math.max(
@@ -1035,4 +1035,155 @@ export const getCompanyReviews = asyncHandler(
       })),
     });
   }
+);
+
+// ========================= Get My Company Profile =========================
+export const getMyCompanyProfile = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+
+    const company = await companyModel
+      .findOne({
+        _id: companyId,
+        deletedAt: { $exists: false },
+      })
+      .select(
+        `
+        companyName
+        email
+        companyPhone
+        description
+        industry
+        address
+        logo
+        coverPic
+        numberOfEmployees
+        rating
+        totalReviews
+        verificationStatus
+        createdAt
+        `
+      );
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    // stats
+    const activeInternships = await internshipModel.countDocuments({
+      companyId,
+      deletedAt: { $exists: false },
+    });
+
+    const internships = await internshipModel.find({
+      companyId,
+    }).select("_id");
+
+    const internshipIds = internships.map(i => i._id);
+
+    const totalApplications = await applicationModel.countDocuments({
+      internshipId: { $in: internshipIds },
+    });
+
+    return res.status(200).json({
+      success: true,
+      company,
+      stats: {
+        activeInternships,
+        totalApplications,
+      },
+    });
+  },
+);
+
+// ========================= Update My Company Profile =========================
+export const updateMyCompanyProfile = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+
+    const {
+      companyName,
+      description,
+      industry,
+      address,
+      companyPhone,
+      numberOfEmployees,
+    } = req.body;
+
+    const company = await companyModel.findOne({
+      _id: companyId,
+      deletedAt: { $exists: false },
+    });
+
+    if (!company) {
+      return next(new Error("Company not found", { cause: 404 }));
+    }
+
+    if (company.bannedAt) {
+      return next(new Error("Company is banned", { cause: 403 }));
+    }
+
+    // unique company name
+    if (
+      companyName &&
+      companyName !== company.companyName
+    ) {
+      const exists = await companyModel.findOne({
+        companyName,
+        _id: { $ne: companyId },
+      });
+
+      if (exists) {
+        return next(
+          new Error("Company name already exists", {
+            cause: 409,
+          }),
+        );
+      }
+
+      company.companyName = companyName;
+    }
+
+    // unique phone
+    if (
+      companyPhone &&
+      companyPhone !== company.companyPhone
+    ) {
+      const exists = await companyModel.findOne({
+        companyPhone,
+        _id: { $ne: companyId },
+      });
+
+      if (exists) {
+        return next(
+          new Error("Phone number already exists", {
+            cause: 409,
+          }),
+        );
+      }
+
+      company.companyPhone = companyPhone;
+    }
+
+    // update optional fields
+    if (description !== undefined)
+      company.description = description;
+
+    if (industry !== undefined)
+      company.industry = industry;
+
+    if (address !== undefined)
+      company.address = address;
+
+    if (numberOfEmployees !== undefined)
+      company.numberOfEmployees = numberOfEmployees;
+
+    await company.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Company profile updated successfully",
+      company,
+    });
+  },
 );
