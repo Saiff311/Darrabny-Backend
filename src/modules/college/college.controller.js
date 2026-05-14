@@ -123,6 +123,13 @@ collegeRouter.get(
   CS.getPendingEndorsements,
 );
 
+collegeRouter.get(
+  "/:collegeId/partners",
+  auth([roles.college]),
+  validation(CV.getCollegePartnersSchema),
+  CS.getCollegePartners,
+);
+
 collegeRouter.patch(
   "/respondToEndorsementRequest/:requestId",
   validation(CV.respondToEndorsementRequestSchema),
