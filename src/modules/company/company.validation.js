@@ -145,6 +145,15 @@ export const getCompanyApplicationsSchema = joi.object({
 // ------------------ emptySchema ------------------
 export const emptySchema = joi.object().length(0);
 
+// ------------------ Verification Documents ------------------
+export const uploadVerificationDocumentSchema = joi.object({
+  documentName: joi.string().trim().min(2).max(120).required(),
+});
+
+export const deleteVerificationDocumentSchema = joi.object({
+  docId: generalRules.id.required(),
+});
+
 // ------------------ Company Settings ------------------
 export const updateCompanySettingsSchema = joi
   .object({

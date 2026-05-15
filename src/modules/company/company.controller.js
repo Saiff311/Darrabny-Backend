@@ -122,6 +122,23 @@ companyRouter.get(
   CS.companyVerification
 );
 
+// ------------------ Upload Verification Document ------------------
+companyRouter.post(
+  "/verification/documents",
+  auth([roles.company]),
+  hostMulter([...fileTypes.image, ...fileTypes.pdf]).single("document"),
+  validation(CV.uploadVerificationDocumentSchema),
+  CS.uploadVerificationDocument,
+);
+
+// ------------------ Delete Verification Document ------------------
+companyRouter.delete(
+  "/verification/documents/:docId",
+  auth([roles.company]),
+  validation(CV.deleteVerificationDocumentSchema),
+  CS.deleteVerificationDocument,
+);
+
 // ------------------ Get Company Dashboard (not completed) ------------------
 companyRouter.get(
   "/dashboard",

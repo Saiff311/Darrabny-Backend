@@ -3,13 +3,16 @@ import companyModel from "../../DB/models/company.model.js";
 import internshipModel from "../../DB/models/internship.model.js";
 import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
-import { internshipAssignmentModel } from "../../DB/models/InternshipAssignment.model.js";
+import { placementModel } from "../../DB/models/placment.model.js";
 import companyReviewModel from "../../DB/models/companyReview.model.js";
+import verificationRequestModel from "../../DB/models/verificationRequest.model.js";
+import verificationDocumentModel from "../../DB/models/verificationDocument.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import partnershipModel from "../../DB/models/partnership.model.js";
 
 // ========================== Add Company ==========================
 export const addCompany = asyncHandler(async (req, res, next) => {
@@ -491,88 +494,496 @@ export const getCompanyApplications = asyncHandler(async (req, res, next) => {
 
 // ========================== Display Company Verification ==========================
 export const companyVerification = asyncHandler(async (req, res, next) => {
-  const companyId = req.company;
-  const company = await companyModel.findById(companyId);
+  const companyId = req.company._id;
+
+  const request = await verificationRequestModel
+    .findOne({ companyId })
+    .sort({ createdAt: -1 })
+    .populate("documents")
+    .lean();
+
+  if (!request) {
+    return res.status(200).json({
+      msg: "Verification details retrieved",
+      data: {
+        status: "not_started",
+        validUntil: null,
+        history: [],
+        documents: [],
+      },
+    });
+  }
+
   return res.status(200).json({
     msg: "Verification details retrieved",
-    status: company.verificationStatus,
-    validUntil: company.validUntil,
+    data: request,
   });
 });
+
+// ========================= Upload Verification Document =========================
+export const uploadVerificationDocument = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+    const { documentName } = req.body;
+
+    if (!req.file) {
+      return next(new Error("Document file is required", { cause: 400 }));
+    }
+
+    const { secure_url } = await cloudinary.uploader.upload(req.file.path, {
+      folder: "verification-documents",
+    });
+
+    let request = await verificationRequestModel
+      .findOne({ companyId })
+      .sort({ createdAt: -1 });
+
+    if (!request) {
+      request = await verificationRequestModel.create({
+        companyId,
+        status: "pending",
+        history: [
+          {
+            action: "document_uploaded",
+            date: new Date(),
+            note: `Uploaded ${documentName}`,
+          },
+        ],
+      });
+    } else {
+      request.status = "pending";
+      request.history.push({
+        action: "document_uploaded",
+        date: new Date(),
+        note: `Uploaded ${documentName}`,
+      });
+      await request.save();
+    }
+
+    const document = await verificationDocumentModel.create({
+      requestId: request._id,
+      documentName,
+      fileUrl: secure_url,
+      status: "pending",
+      uploadDate: new Date(),
+    });
+
+    await companyModel.updateOne(
+      { _id: companyId },
+      { verificationStatus: "pending", validUntil: null },
+    );
+
+    const populatedRequest = await verificationRequestModel
+      .findById(request._id)
+      .populate("documents")
+      .lean();
+
+    return res.status(201).json({
+      msg: "Verification document uploaded successfully",
+      document,
+      data: populatedRequest,
+    });
+  },
+);
+
+// ========================= Delete Verification Document =========================
+export const deleteVerificationDocument = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+    const { docId } = req.params;
+
+    const document = await verificationDocumentModel.findById(docId);
+    if (!document) {
+      return next(new Error("Verification document not found", { cause: 404 }));
+    }
+
+    if (document.status === "approved") {
+      return next(
+        new Error("Approved documents cannot be deleted", { cause: 400 }),
+      );
+    }
+
+    const request = await verificationRequestModel.findById(document.requestId);
+    if (!request || String(request.companyId) !== String(companyId)) {
+      return next(new Error("Not authorized to delete this document", { cause: 403 }));
+    }
+
+    await document.deleteOne();
+
+    request.history.push({
+      action: "document_deleted",
+      date: new Date(),
+      note: `Deleted ${document.documentName}`,
+    });
+    await request.save();
+
+    return res.status(200).json({
+      msg: "Verification document deleted successfully",
+    });
+  },
+);
 
 // ========================= Company Dashboard ==========================
 export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
   const companyId = req.company._id;
 
-  let stats = {
-    totalApplicants: 0,
-    applicantsGrowth: 0,
-    totalCompletedTrainees: 0,
-    activePostings: {
-      total: 0,
-      internships: 0,
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const currentYearStart = new Date(now.getFullYear(), 0, 1);
+  const nextYearStart = new Date(now.getFullYear() + 1, 0, 1);
+  const lastYearStart = new Date(now.getFullYear() - 1, 0, 1);
+
+  const applicantsAggPromise = applicationModel.aggregate([
+    {
+      $match: {
+        companyId,
+      },
     },
-    acceptanceRate: 0,
-  };
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        currentMonth: [
+          {
+            $match: {
+              appliedAt: { $gte: currentMonthStart, $lt: nextMonthStart },
+            },
+          },
+          { $count: "count" },
+        ],
+        previousMonth: [
+          {
+            $match: {
+              appliedAt: { $gte: previousMonthStart, $lt: currentMonthStart },
+            },
+          },
+          { $count: "count" },
+        ],
+      },
+    },
+  ]);
 
-  let ongoingInternships = [];
+  const acceptanceAggPromise = applicationModel.aggregate([
+    {
+      $match: {
+        companyId,
+      },
+    },
+    {
+      $addFields: {
+        lastStatus: {
+          $arrayElemAt: ["$timeline.status", -1],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        accepted: {
+          $sum: {
+            $cond: [{ $eq: ["$lastStatus", "accepted"] }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
 
-  let verification = {
-    status: "pending",
-    validUntil: null,
-  };
-
-  // total applicants
-  const totalApplicants = await applicationModel.countDocuments({
-    company: companyId,
-  });
-  stats.totalApplicants = totalApplicants;
-
-  // active internships
-  const internships = await internshipModel.countDocuments({
-    company: companyId,
-    status: "inProgress",
-  });
-
-  stats.activePostings.internships = internships;
-  stats.activePostings.total = internships;
-
-  // completed trainees
-  const completed = await internshipAssignmentModel.countDocuments({
-    company: companyId,
-    status: "completed",
-  });
-
-  stats.totalCompletedTrainees = completed;
-
-  try {
-    // ongoing interns preview
-    ongoingInternships = await internshipAssignmentModel
-      .find({
-        company: companyId,
+  const activePostingsAggPromise = internshipModel.aggregate([
+    {
+      $match: {
+        companyId,
+        deletedAt: { $exists: false },
+        closed: { $ne: true },
         status: { $in: ["onboarding", "in-progress"] },
-      })
-      .limit(3)
-      .populate("student", "name")
-      .populate("internship", "title");
-  } catch (err) {
-    ongoingInternships = [];
-  }
+      },
+    },
+    {
+      $group: {
+        _id: { $ifNull: ["$internshipType", "internship"] },
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$count" },
+        byType: { $push: { k: "$_id", v: "$count" } },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        total: 1,
+        byType: { $arrayToObject: "$byType" },
+      },
+    },
+  ]);
 
-  const company = await companyModel
+  const completedTraineesAggPromise = placementModel.aggregate([
+    {
+      $match: {
+        companyId,
+        status: "completed",
+      },
+    },
+    {
+      $addFields: {
+        completionDateEffective: {
+          $ifNull: ["$completionDate", "$updatedAt"],
+        },
+      },
+    },
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        currentYear: [
+          {
+            $match: {
+              completionDateEffective: {
+                $gte: currentYearStart,
+                $lt: nextYearStart,
+              },
+            },
+          },
+          { $count: "count" },
+        ],
+        lastYear: [
+          {
+            $match: {
+              completionDateEffective: {
+                $gte: lastYearStart,
+                $lt: currentYearStart,
+              },
+            },
+          },
+          { $count: "count" },
+        ],
+      },
+    },
+  ]);
+
+  const ongoingInternshipsAggPromise = placementModel.aggregate([
+    {
+      $match: {
+        companyId,
+        status: { $in: ["pending", "ongoing"] },
+      },
+    },
+    {
+      $lookup: {
+        from: "internships",
+        localField: "internshipId",
+        foreignField: "_id",
+        as: "internship",
+      },
+    },
+    { $unwind: "$internship" },
+    {
+      $lookup: {
+        from: "students",
+        localField: "studentId",
+        foreignField: "_id",
+        as: "student",
+      },
+    },
+    { $unwind: "$student" },
+    {
+      $lookup: {
+        from: "users",
+        localField: "student.userId",
+        foreignField: "_id",
+        as: "user",
+      },
+    },
+    { $unwind: "$user" },
+    {
+      $lookup: {
+        from: "colleges",
+        localField: "student.collegeId",
+        foreignField: "_id",
+        as: "college",
+      },
+    },
+    {
+      $unwind: {
+        path: "$college",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $lookup: {
+        from: "placements",
+        let: { internshipId: "$internshipId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$internshipId", "$$internshipId"] },
+                  { $in: ["$status", ["pending", "ongoing"]] },
+                ],
+              },
+            },
+          },
+          { $count: "count" },
+        ],
+        as: "activeCount",
+      },
+    },
+    {
+      $addFields: {
+        activeCount: {
+          $ifNull: [{ $arrayElemAt: ["$activeCount.count", 0] }, 0],
+        },
+        statusLabel: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$status", "pending"] }, then: "Onboarding" },
+              { case: { $eq: ["$status", "ongoing"] }, then: "Active" },
+            ],
+            default: "Active",
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        internshipId: "$internshipId",
+        role: "$internship.internshipTitle",
+        status: "$statusLabel",
+        student: {
+          name: { $concat: ["$user.firstName", " ", "$user.lastName"] },
+          email: "$user.email",
+        },
+        universityName: "$college.collegeName",
+        studentCount: {
+          current: "$activeCount",
+          capacity: { $ifNull: ["$internship.capacity", null] },
+        },
+      },
+    },
+  ]);
+
+  const verificationPromise = companyModel
     .findById(companyId)
-    .select("verificationStatus");
+    .select("verificationStatus validUntil")
+    .lean();
 
-  if (company) {
-    verification = {
-      status: company.verificationStatus || "pending",
-    };
-  }
+  const academicPartnersPromise = partnershipModel.aggregate([
+    {
+      $match: {
+        companyId,
+      },
+    },
+    {
+      $lookup: {
+        from: "colleges",
+        localField: "universityId",
+        foreignField: "_id",
+        as: "college",
+      },
+    },
+    { $unwind: "$college" },
+    {
+      $project: {
+        _id: 0,
+        universityName: "$college.collegeName",
+        agreementStatus: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$status", "active"] }, then: "Active Agreement" },
+              { case: { $eq: ["$status", "pending"] }, then: "Pending" },
+              { case: { $eq: ["$status", "rejected"] }, then: "Rejected" },
+            ],
+            default: "Pending",
+          },
+        },
+      },
+    },
+  ]);
 
-  return res.status(200).json({
-    stats,
+  const [
+    applicantsAgg,
+    acceptanceAgg,
+    activePostingsAgg,
+    completedTraineesAgg,
     ongoingInternships,
     verification,
+    academicPartners,
+  ] = await Promise.all([
+    applicantsAggPromise,
+    acceptanceAggPromise,
+    activePostingsAggPromise,
+    completedTraineesAggPromise,
+    ongoingInternshipsAggPromise,
+    verificationPromise,
+    academicPartnersPromise,
+  ]);
+
+  const applicantsStats = applicantsAgg?.[0] || {};
+  const totalApplicants = applicantsStats.total?.[0]?.count || 0;
+  const currentMonthApplicants = applicantsStats.currentMonth?.[0]?.count || 0;
+  const previousMonthApplicants = applicantsStats.previousMonth?.[0]?.count || 0;
+  const applicantsGrowth =
+    previousMonthApplicants === 0
+      ? currentMonthApplicants > 0
+        ? 100
+        : 0
+      : ((currentMonthApplicants - previousMonthApplicants) /
+          previousMonthApplicants) *
+        100;
+
+  const acceptanceStats = acceptanceAgg?.[0] || { total: 0, accepted: 0 };
+  const acceptanceRate =
+    acceptanceStats.total === 0
+      ? 0
+      : (acceptanceStats.accepted / acceptanceStats.total) * 100;
+
+  const activePostingStats = activePostingsAgg?.[0] || {
+    total: 0,
+    byType: {},
+  };
+
+  const completedStats = completedTraineesAgg?.[0] || {};
+  const totalCompletedTrainees = completedStats.total?.[0]?.count || 0;
+  const currentYearCompleted = completedStats.currentYear?.[0]?.count || 0;
+  const lastYearCompleted = completedStats.lastYear?.[0]?.count || 0;
+  const completedGrowth =
+    lastYearCompleted === 0
+      ? currentYearCompleted > 0
+        ? 100
+        : 0
+      : ((currentYearCompleted - lastYearCompleted) / lastYearCompleted) * 100;
+
+  return res.status(200).json({
+    kpis: {
+      totalApplicants: {
+        count: totalApplicants,
+        growthPct: Number(applicantsGrowth.toFixed(2)),
+      },
+      totalCompletedTrainees: {
+        count: totalCompletedTrainees,
+        growthPct: Number(completedGrowth.toFixed(2)),
+      },
+      activePostings: {
+        total: activePostingStats.total || 0,
+        internships: activePostingStats.byType?.internship || 0,
+        jobs:
+          activePostingStats.byType?.job ||
+          activePostingStats.byType?.jobs ||
+          0,
+      },
+    },
+    ongoingInternships,
+    acceptanceRate: Number(acceptanceRate.toFixed(2)),
+    verificationStatus: {
+      status: verification?.verificationStatus || "pending",
+      validUntil: verification?.validUntil || null,
+    },
+    academicPartners,
   });
 });
 
