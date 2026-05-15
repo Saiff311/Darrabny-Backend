@@ -532,6 +532,7 @@ export const uploadVerificationDocument = asyncHandler(
 
     const { secure_url } = await cloudinary.uploader.upload(req.file.path, {
       folder: "verification-documents",
+      resource_type: "auto"
     });
 
     let request = await verificationRequestModel
