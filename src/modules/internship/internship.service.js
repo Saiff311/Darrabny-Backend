@@ -157,16 +157,28 @@ export const getInternship = asyncHandler(async (req, res, next) => {
 });
 
 // ========================== Update Internship ==========================
+// فوق خالص في الملف لازم تعمل import لمكتبة كلاوديناري لو مش عاملها
+// import cloudinary from 'cloudinary'; // (أو مسار ملف إعدادات كلاوديناري بتاعك)
+
 export const updateInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
   const companyId = req.company._id;
   req.body.updatedBy = companyId;
 
-  // ✅ الخطوة المفقودة: إضافة رابط الصورة للـ body لو الشركة رفعت صورة جديدة
+  // ✅ التعديل هنا: الرفع الفعلي على Cloudinary
   if (req.file) {
-    // استخدم secure_url لو بتسيف على Cloudinary
-    // أو استخدم path لو بتسيف على الفولدر المحلي (uploads)
-    req.body.thumbnail = req.file.secure_url || req.file.path;
+    try {
+      // بنرفع الملف من المسار المؤقت اللي Multer عمله لـ Cloudinary
+      const { secure_url } = await cloudinary.uploader.upload(req.file.path, {
+        folder: `intern-app/internships/${internshipId}`, // اختياري: لتنظيم الفولدرات هناك
+      });
+      
+      // دلوقتي بناخد الرابط الحقيقي اللي راجع من كلاوديناري ونحطه في الـ body
+      req.body.thumbnail = secure_url;
+      
+    } catch (error) {
+      return next(new Error("Failed to upload image to Cloudinary", { cause: 500 }));
+    }
   }
 
   const internship = await internshipModel.findOneAndUpdate(
