@@ -58,6 +58,8 @@ export const getInternshipStudents = asyncHandler(async (req, res, next) => {
 
   const students = placements.map((placement) => ({
     placementId: placement._id,
+    studentId: placement.studentId._id,
+    userId: placement.studentId.userId._id,
     currentPerformance: placement.currentPerformance || 0,
     fullName: `${placement.studentId.userId.firstName} ${placement.studentId.userId.lastName}`,
     email: placement.studentId.userId.email,
