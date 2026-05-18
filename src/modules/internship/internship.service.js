@@ -757,7 +757,20 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
   }
 
   // 5. التحقق من السيرة الذاتية
-  if (!student.resume?.secure_url) {
+ // 5. التحقق من السيرة الذاتية وتجهيز الرابط
+  let finalResumeUrl = student.resume?.secure_url;
+
+  // لو الطالب رفع ملف جديد في الريكويست ده
+  if (req.file) {
+    // هنا المفروض تكتب كود الرفع على Cloudinary أو أي Storage
+    // const { secure_url } = await cloudinary.uploader.upload(req.file.path, ...);
+    // finalResumeUrl = secure_url; 
+    
+    // مؤقتاً للتبسيط لو بتسيف local:
+    finalResumeUrl = req.file.path; 
+  }
+
+  if (!finalResumeUrl) {
     return next(new Error("resume is required", { cause: 400 }));
   }
 
