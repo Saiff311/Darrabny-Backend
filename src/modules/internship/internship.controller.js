@@ -150,7 +150,6 @@ internshipRouter.patch(
 internshipRouter.get(
   "/:internshipId",
   validation(JV.InternshipIdSchema),
-  auth(Object.values(roles)),
   JS.getInternshipById
 );
 
