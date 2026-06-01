@@ -5,6 +5,8 @@ import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import { internshipAssignmentModel } from "../../DB/models/InternshipAssignment.model.js";
 import companyReviewModel from "../../DB/models/companyReview.model.js";
+import { placementModel } from "../../DB/models/placment.model.js";
+import userModel from "../../DB/models/user.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
@@ -1230,4 +1232,152 @@ export const updateMyCompanyProfile = asyncHandler(
       company,
     });
   },
+);
+
+// ========================= Completed Internships Overview =========================
+export const getCompletedInternshipsOverview = asyncHandler(
+  async (req, res, next) => {
+    const companyId = req.company._id;
+
+    // ========================= Placements =========================
+    const completedPlacements = await placementModel
+      .find({
+        companyId,
+        // status: "completed",
+      })
+      .populate(
+        "studentId",
+        `
+          firstName
+          lastName
+          profilePic
+        `
+      )
+      .populate(
+        "internshipId",
+        `
+          internshipTitle
+          industry
+        `
+      )
+      .sort({ createdAt: -1 });
+
+    // ========================= Stats =========================
+    const totalGraduates = completedPlacements.length;
+
+    const successfulPlacements = completedPlacements.filter((placement) =>
+      ["excellent", "very good", "good"].includes(
+        placement.finalEvaluation
+      )
+    ).length;
+
+    const successRate =
+      totalGraduates > 0
+        ? Number(
+            (
+              (successfulPlacements / totalGraduates) *
+              100
+            ).toFixed(1)
+          )
+        : 0;
+
+    // ========================= Top Department =========================
+    const majorCounts = {};
+
+    completedPlacements.forEach((placement) => {
+      const major = placement.majorSnapshot || "Unknown";
+
+      majorCounts[major] = (majorCounts[major] || 0) + 1;
+    });
+
+    let topDepartment = null;
+    let maxMajorCount = 0;
+
+    for (const major in majorCounts) {
+      if (majorCounts[major] > maxMajorCount) {
+        maxMajorCount = majorCounts[major];
+        topDepartment = major;
+      }
+    }
+
+    // ========================= Industry Distribution =========================
+    const industryCounts = {};
+
+    completedPlacements.forEach((placement) => {
+      const industry =
+        placement.industry ||
+        placement.internshipId?.industry ||
+        "Other";
+
+      industryCounts[industry] =
+        (industryCounts[industry] || 0) + 1;
+    });
+
+    const industryDistribution = Object.entries(
+      industryCounts
+    ).map(([industry, count]) => ({
+      industry,
+
+      count,
+
+      percentage:
+        totalGraduates > 0
+          ? Number(
+              ((count / totalGraduates) * 100).toFixed(1)
+            )
+          : 0,
+    }));
+
+    // ========================= Recent Completions =========================
+    const recentCompletions = completedPlacements
+      .slice(0, 10)
+      .map((placement) => ({
+        placementId: placement._id,
+
+        student: {
+          id: placement.studentId?._id,
+
+          fullName: `${placement.studentId?.firstName || ""} ${
+            placement.studentId?.lastName || ""
+          }`.trim(),
+
+          profilePic:
+            placement.studentId?.profilePic || null,
+        },
+
+        major:
+          placement.majorSnapshot || "Not Specified",
+
+        internship: {
+          id: placement.internshipId?._id,
+
+          title:
+            placement.internshipId?.internshipTitle ||
+            "Internship",
+        },
+
+        evaluation: placement.finalEvaluation,
+
+        completionDate:
+          placement.completionDate ||
+          placement.updatedAt,
+      }));
+
+    // ========================= Response =========================
+    return res.status(200).json({
+      success: true,
+
+      overview: {
+        totalGraduates,
+
+        successRate,
+
+        topDepartment,
+
+        industryDistribution,
+      },
+
+      recentCompletions,
+    });
+  }
 );

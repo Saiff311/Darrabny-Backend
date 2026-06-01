@@ -212,4 +212,12 @@ companyRouter.patch(
   CS.updateMyCompanyProfile,
 );
 
+// ========================= Completed Internships Overview =========================
+companyRouter.get(
+  "/completed-overview",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.getCompletedInternshipsOverview,
+);
+
 export default companyRouter;
