@@ -24,5 +24,26 @@ adminRouter.patch("/ban-unBan-company/:id",
     auth([roles.admin]) ,
     AS.banCompany)
 
+// ------------------ Get Pending Verification Requests ------------------
+adminRouter.get(
+    "/verifications/pending",
+    validation(AV.emptySchema),
+    auth([roles.admin]),
+    AS.getPendingVerifications)
+
+// ------------------ Review Verification Document ------------------
+adminRouter.patch(
+    "/verifications/documents/:docId",
+    validation(AV.updateDocumentStatusSchema),
+    auth([roles.admin]),
+    AS.updateDocumentStatus)
+
+// ------------------ Update Verification Request Status ------------------
+adminRouter.patch(
+    "/verifications/:requestId/status",
+    validation(AV.updateVerificationStatusSchema),
+    auth([roles.admin]),
+    AS.updateVerificationStatus)
+
 
 export default adminRouter

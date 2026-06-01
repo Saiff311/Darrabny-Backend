@@ -58,6 +58,8 @@ export const getInternshipStudents = asyncHandler(async (req, res, next) => {
 
   const students = placements.map((placement) => ({
     placementId: placement._id,
+    studentId: placement.studentId._id,
+    userId: placement.studentId.userId._id,
     currentPerformance: placement.currentPerformance || 0,
     fullName: `${placement.studentId.userId.firstName} ${placement.studentId.userId.lastName}`,
     email: placement.studentId.userId.email,
@@ -157,16 +159,28 @@ export const getInternship = asyncHandler(async (req, res, next) => {
 });
 
 // ========================== Update Internship ==========================
+// فوق خالص في الملف لازم تعمل import لمكتبة كلاوديناري لو مش عاملها
+// import cloudinary from 'cloudinary'; // (أو مسار ملف إعدادات كلاوديناري بتاعك)
+
 export const updateInternship = asyncHandler(async (req, res, next) => {
   const { internshipId } = req.params;
   const companyId = req.company._id;
   req.body.updatedBy = companyId;
 
-  // ✅ الخطوة المفقودة: إضافة رابط الصورة للـ body لو الشركة رفعت صورة جديدة
+  // ✅ التعديل هنا: الرفع الفعلي على Cloudinary
   if (req.file) {
-    // استخدم secure_url لو بتسيف على Cloudinary
-    // أو استخدم path لو بتسيف على الفولدر المحلي (uploads)
-    req.body.thumbnail = req.file.secure_url || req.file.path;
+    try {
+      // بنرفع الملف من المسار المؤقت اللي Multer عمله لـ Cloudinary
+      const { secure_url } = await cloudinary.uploader.upload(req.file.path, {
+        folder: `intern-app/internships/${internshipId}`, // اختياري: لتنظيم الفولدرات هناك
+      });
+      
+      // دلوقتي بناخد الرابط الحقيقي اللي راجع من كلاوديناري ونحطه في الـ body
+      req.body.thumbnail = secure_url;
+      
+    } catch (error) {
+      return next(new Error("Failed to upload image to Cloudinary", { cause: 500 }));
+    }
   }
 
   const internship = await internshipModel.findOneAndUpdate(
@@ -757,7 +771,20 @@ export const ApplyToInternship = asyncHandler(async (req, res, next) => {
   }
 
   // 5. التحقق من السيرة الذاتية
-  if (!student.resume?.secure_url) {
+ // 5. التحقق من السيرة الذاتية وتجهيز الرابط
+  let finalResumeUrl = student.resume?.secure_url;
+
+  // لو الطالب رفع ملف جديد في الريكويست ده
+  if (req.file) {
+    // هنا المفروض تكتب كود الرفع على Cloudinary أو أي Storage
+    // const { secure_url } = await cloudinary.uploader.upload(req.file.path, ...);
+    // finalResumeUrl = secure_url; 
+    
+    // مؤقتاً للتبسيط لو بتسيف local:
+    finalResumeUrl = req.file.path; 
+  }
+
+  if (!finalResumeUrl) {
     return next(new Error("resume is required", { cause: 400 }));
   }
 

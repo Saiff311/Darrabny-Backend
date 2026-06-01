@@ -31,7 +31,7 @@ export const analyzeApplicationWithAI = async (studentData, internshipData) => {
 
     // 2. إرسال الطلب للموديل الجديد
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // أو الموديل اللي استقر معاك
+      model: "gemini-3-flash-preview",
       contents: [
         {
           role: "user",

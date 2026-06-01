@@ -5,11 +5,13 @@ import internshipModel from "../../DB/models/internship.model.js";
 import internshipReportModel from "../../DB/models/internshipReport.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import companyModel from "../../DB/models/company.model.js";
+import partnershipModel from "../../DB/models/partnership.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { internshipStatus, appStatus, roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import jwt from "jsonwebtoken";
 import { compare } from "../../utils/security/hashing.js";
+import { escapeRegex } from "../../utils/security/escapeRegax.js";
 
 export const addCollege = asyncHandler(async (req, res, next) => {
   const { collegeName, collegeEmail } = req.body;
@@ -286,11 +288,11 @@ export const collegeSignup = asyncHandler(async (req, res, next) => {
 });
 
 export const collegeSignin = asyncHandler(async (req, res, next) => {
-  const { collegeEmail, password } = req.body;
+  const { email, password } = req.body;
   const role = "college";
 
   const college = await collegeModel.findOne({
-    collegeEmail,
+    collegeEmail: email,
     deletedAt: { $exists: false },
   });
 
@@ -432,6 +434,23 @@ export const respondToEndorsementRequest = asyncHandler(async (req, res, next) =
   // 3. تحديث الحالة
   request.status = status;
   await request.save();
+
+  if (status === "approved") {
+    const companyId = request.companyId;
+    if (companyId) {
+      const existingPartnership = await partnershipModel.findOne({
+        universityId,
+        companyId,
+      });
+      if (!existingPartnership) {
+        await partnershipModel.create({
+          universityId,
+          companyId,
+          status: "active",
+        });
+      }
+    }
+  }
 
   // (اختياري) ممكن هنا تعمل Log أو تبعت Notification للشركة إن طلبها اترد عليه
 
@@ -881,6 +900,178 @@ export const getCollegeDashboard = asyncHandler(async (req, res, next) => {
       })),
 
       academicPartners,
+    },
+  });
+});
+
+// ========================= Get College Partners =========================
+export const getCollegePartners = asyncHandler(async (req, res, next) => {
+  // 1. استخراج الـ ID الخاص بالكلية من التوكن
+  const collegeId = req.college?._id;
+
+  if (!collegeId) {
+    return next(
+      new Error("College authentication required", {
+        cause: 401,
+      }),
+    );
+  }
+
+  // 2. تجهيز الـ Pagination
+  const page = Number.parseInt(req.query.page, 10) || 1;
+  const limit = Number.parseInt(req.query.limit, 10) || 10;
+
+  const safePage = page > 0 ? page : 1;
+  const safeLimit = limit > 0 ? limit : 10;
+  const skip = (safePage - 1) * safeLimit;
+
+  // 3. جلب معرفات الشركات (الشركاء) من جدول الشراكات بناءً على الكلية
+  const partnerships = await partnershipModel
+    .find({ universityId: collegeId })
+    .select("companyId")
+    .lean();
+
+  const partnerCompanyIds = partnerships
+    .map((item) => item.companyId)
+    .filter(Boolean);
+
+  // لو مفيش أي شركاء، نرجع مصفوفة فاضية
+  if (!partnerCompanyIds.length) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        companies: [],
+        pagination: {
+          totalCompanies: 0,
+          currentPage: safePage,
+          totalPages: 0,
+        },
+      },
+    });
+  }
+
+  // 4. تجهيز الفلاتر (البحث، الصناعة، الموقع)
+  const { search, industry, location } = req.query;
+  const companyQuery = {
+    _id: { $in: partnerCompanyIds },
+    deletedAt: { $exists: false },
+  };
+
+  if (search) {
+    companyQuery.companyName = {
+      $regex: escapeRegex(search),
+      $options: "i",
+    };
+  }
+
+  if (industry) {
+    companyQuery.industry = {
+      $regex: escapeRegex(industry),
+      $options: "i",
+    };
+  }
+
+  if (location) {
+    companyQuery.address = {
+      $regex: escapeRegex(location),
+      $options: "i",
+    };
+  }
+
+  // 5. حساب العدد الإجمالي للشركات (عشان الـ Pagination)
+  const totalCompanies = await companyModel.countDocuments(companyQuery);
+
+  if (!totalCompanies) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        companies: [],
+        pagination: {
+          totalCompanies: 0,
+          currentPage: safePage,
+          totalPages: 0,
+        },
+      },
+    });
+  }
+
+  // 6. جلب بيانات الشركات بالعدد والصفحة المطلوبة
+  const companies = await companyModel
+    .find(companyQuery)
+    .select("companyName logo industry address")
+    .sort({ companyName: 1 })
+    .skip(skip)
+    .limit(safeLimit)
+    .lean();
+
+  const companyIdsPage = companies.map((company) => company._id);
+
+  // 7. جلب التقييمات للشركات دي وحساب المتوسط
+  const ratingsAgg = await internshipReportModel.aggregate([
+    {
+      $match: {
+        overallRating: { $ne: null },
+      },
+    },
+    {
+      $lookup: {
+        from: "internships",
+        localField: "internshipId",
+        foreignField: "_id",
+        as: "internship",
+      },
+    },
+    {
+      $unwind: "$internship",
+    },
+    {
+      $match: {
+        "internship.companyId": { $in: companyIdsPage },
+      },
+    },
+    {
+      $group: {
+        _id: "$internship.companyId",
+        avgRating: { $avg: "$overallRating" },
+        reviewCount: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const ratingsMap = new Map(
+    ratingsAgg.map((item) => [item._id.toString(), item]),
+  );
+
+  // 8. تجميع البيانات النهائية
+  const data = companies.map((company) => {
+    const ratingInfo = ratingsMap.get(company._id.toString()) || {};
+    const rating = ratingInfo.avgRating
+      ? Number(ratingInfo.avgRating.toFixed(2))
+      : 0;
+    const reviewCount = ratingInfo.reviewCount || 0;
+
+    return {
+      companyId: company._id,
+      companyName: company.companyName,
+      logoUrl: company.logo?.secure_url || null,
+      rating,
+      reviewCount,
+      isTopPartner: rating >= 4.5 && reviewCount > 50,
+      industry: company.industry || null,
+      location: company.address || null,
+      coreCompetencies: [], // تقدر تملاها بعدين لو ليها موديل خاص أو موجودة جوه الـ company
+    };
+  });
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      companies: data,
+      pagination: {
+        totalCompanies,
+        currentPage: safePage,
+        totalPages: Math.ceil(totalCompanies / safeLimit),
+      },
     },
   });
 });

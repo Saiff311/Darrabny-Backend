@@ -103,7 +103,7 @@ export const getAllUniversitiesSchema = joi.object({
 
 
 export const collegeSigninSchema = joi.object({
-    collegeEmail: generalRules.email.required(),
+    email: generalRules.email.required(),
     password: joi.string().required(),
 });
 
@@ -111,6 +111,16 @@ export const respondToEndorsementRequestSchema = joi.object({
     requestId: generalRules.id.required(),
     status: joi.string().valid("approved", "rejected").required(),
 })
+
+export const getCollegePartnersSchema = {
+    query: joi.object({
+        page: joi.number().integer().min(1).optional(),
+        limit: joi.number().integer().min(1).max(100).optional(),
+        search: joi.string().trim().optional(),
+        industry: joi.string().trim().optional(),
+        location: joi.string().trim().optional(),
+    }),
+}
 
 // ------------------ emptySchema ------------------
 export const emptySchema = joi.object().length(0)

@@ -68,9 +68,18 @@ export const getLoginStudent = asyncHandler(async (req, res, next) => {
 
   if (!user) return next(new Error("User not found", { cause: 404 }));
 
+  const student = await studentModel
+    .findOne({ userId: req.user._id })
+    .select("badges")
+    .lean();
+
   user.mobileNumber = await decrypt(user.mobileNumber);
 
-  return res.status(200).json({ msg: "My Profile", user });
+  return res.status(200).json({
+    msg: "My Profile",
+    user,
+    badges: student?.badges || [],
+  });
 });
 
 // ========================== Student Profile ==========================

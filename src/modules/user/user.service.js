@@ -7,6 +7,7 @@ import internshipModel from "../../DB/models/internship.model.js";
 import applicationModel from "../../DB/models/application.model.js";
 import { appStatus } from "../../utils/enums.js";
 import mongoose from "mongoose";
+import studentModel from "../../DB/models/student.model.js";
 
 //--------------------------------Etoo--------------------------------------------------------
 export const UpdateAccount = asyncHandler(async (req, res, next) => {
@@ -48,6 +49,10 @@ export const getLoginUser = asyncHandler(async (req, res, next) => {
   const user = await userModel.findById(req.user._id)
   //decrypt mobile number
   user.mobileNumber = await decrypt(user.mobileNumber)
+  const student = await studentModel
+    .findOne({ userId: req.user._id })
+    .select("badges")
+    .lean()
   return res.status(200).json({
     msg: "My Profile",
     id: user._id,
@@ -55,6 +60,7 @@ export const getLoginUser = asyncHandler(async (req, res, next) => {
     email: user.email,
     phoneNumber: user.mobileNumber,
     address: user.address,
+    badges: student?.badges || [],
     notifications: {
       "email": true,
       "push": true
