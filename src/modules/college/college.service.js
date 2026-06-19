@@ -135,6 +135,33 @@ export const getCollegeByName = asyncHandler(async (req, res, next) => {
   return res.json({ msg: "College fetched successfully", college });
 });
 
+export const getUniversityLogo = asyncHandler(async (req, res, next) => {
+  const universityId = req.college?._id;
+
+  if (!universityId) {
+    return next(new Error("College authentication required", { cause: 401 }));
+  }
+
+  const university = await collegeModel
+    .findOne({
+      _id: universityId,
+      deletedAt: { $exists: false },
+    })
+    .select("logo")
+    .lean();
+
+  if (!university) {
+    return next(new Error("University not found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      logo: university.logo?.secure_url || null,
+    },
+  });
+});
+
 export const uploadCollegeLogo = asyncHandler(async (req, res, next) => {
   const { collegeId } = req.params;
   const college = await collegeModel.findOne({

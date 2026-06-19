@@ -6,6 +6,8 @@ import userModel from "../../DB/models/user.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
 import { placementModel } from "../../DB/models/placment.model.js";
+import internshipReportModel from "../../DB/models/internshipReport.model.js";
+import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import { emailEvent } from "../../services/sendEmail/email.event.js";
 import { escapeRegex } from "../../utils/security/escapeRegax.js";
@@ -48,6 +50,18 @@ export const getInternshipStudents = asyncHandler(async (req, res, next) => {
     })
     .lean();
 
+  // Reports are stored in internship_report with studentId, so one bulk query can flag all students.
+  const studentIds = placements.map((placement) => placement.studentId?._id);
+  const studentsWithReports = studentIds.length
+    ? await internshipReportModel.distinct("studentId", {
+        internshipId,
+        studentId: { $in: studentIds },
+      })
+    : [];
+  const studentsWithReportsSet = new Set(
+    studentsWithReports.map((studentId) => String(studentId)),
+  );
+
   if (!placements.length) {
     return res.status(200).json({
       success: true,
@@ -61,6 +75,9 @@ export const getInternshipStudents = asyncHandler(async (req, res, next) => {
     studentId: placement.studentId._id,
     userId: placement.studentId.userId._id,
     currentPerformance: placement.currentPerformance || 0,
+    reportLabel: studentsWithReportsSet.has(String(placement.studentId._id))
+      ? "Has Report"
+      : null,
     fullName: `${placement.studentId.userId.firstName} ${placement.studentId.userId.lastName}`,
     email: placement.studentId.userId.email,
     avatar: placement.studentId.userId.profilePic?.secure_url || null,
@@ -272,6 +289,30 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     return next(new Error("No internships found", { cause: 404 }));
   }
 
+  const internshipIds = internships.map((internship) => internship._id);
+
+  const partnerUniversityAggregation = await internshipApprovalModel.aggregate([
+    {
+      $match: {
+        internshipId: { $in: internshipIds },
+        status: "approved",
+      },
+    },
+    {
+      $group: {
+        _id: "$internshipId",
+        partnerUniversityIds: { $addToSet: "$universityId" },
+      },
+    },
+  ]);
+
+  const partnerUniversityIdsMap = new Map(
+    partnerUniversityAggregation.map((item) => [
+      item._id.toString(),
+      item.partnerUniversityIds.map((universityId) => universityId.toString()),
+    ]),
+  );
+
   // === الجديد هنا: حساب عدد الطلبة والتقارير لكل تدريب بالتوازي ===
   const internshipsWithStats = await Promise.all(
     internships.map(async (internship) => {
@@ -304,6 +345,8 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
         ...internship,
         studentsCount,
         pendingReportsCount,
+        partnerUniversityIds:
+          partnerUniversityIdsMap.get(internship._id.toString()) || [],
       };
     }),
   );

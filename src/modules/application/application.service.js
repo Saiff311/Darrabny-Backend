@@ -180,13 +180,16 @@ export const getApplicationsForSpecificInternship = asyncHandler(
   async (req, res, next) => {
     const { internshipId } = req.params;
     const authCompany = req.company;
+    const excludedStatuses = ["accepted", "rejected"];
 
     if (!authCompany) {
       return next(new Error("Company authentication required", { cause: 401 }));
     }
 
     const { page = 1, limit = 5, sort = "-aiAnalysis.score" } = req.query;
-    const skip = (page - 1) * limit;
+    const currentPage = Number(page);
+    const pageSize = Number(limit);
+    const skip = (currentPage - 1) * pageSize;
 
     let internship = await internshipModel.findById(internshipId);
 
@@ -206,10 +209,13 @@ export const getApplicationsForSpecificInternship = asyncHandler(
     internship = await internship.populate([
       {
         path: "Applications",
+        match: {
+          "timeline.status": { $nin: excludedStatuses },
+        },
         options: {
           sort,
           skip,
-          limit,
+          limit: pageSize,
         },
         populate: {
           path: "userId",
@@ -220,6 +226,7 @@ export const getApplicationsForSpecificInternship = asyncHandler(
 
     const totalCount = await applicationModel.countDocuments({
       internshipId: internship._id,
+      "timeline.status": { $nin: excludedStatuses },
     });
 
     if (!internship.Applications || internship.Applications.length === 0) {
@@ -227,7 +234,7 @@ export const getApplicationsForSpecificInternship = asyncHandler(
         success: true,
         message: "No applications found yet",
         data: [],
-        pagination: { totalCount: 0 },
+        pagination: { totalCount },
       });
     }
 
@@ -236,8 +243,8 @@ export const getApplicationsForSpecificInternship = asyncHandler(
       message: "Applications fetched and ranked successfully",
       data: internship,
       pagination: {
-        currentPage: Number(page),
-        totalPages: Math.ceil(totalCount / limit),
+        currentPage,
+        totalPages: Math.ceil(totalCount / pageSize),
         totalCount,
       },
     });

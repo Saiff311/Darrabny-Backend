@@ -40,6 +40,14 @@ companyRouter.get(
   CS.getCompany,
 );
 
+// ------------------ Get My Company Logo ------------------
+companyRouter.get(
+  "/logo",
+  auth([roles.company]),
+  validation(CV.emptySchema),
+  CS.getCompanyLogo,
+);
+
 // ------------------ Get Company by Name ------------------
 companyRouter.get(
   "/getCompanyByName",

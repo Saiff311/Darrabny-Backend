@@ -169,6 +169,33 @@ export const getCompany = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const getCompanyLogo = asyncHandler(async (req, res, next) => {
+  const companyId = req.company?._id;
+
+  if (!companyId) {
+    return next(new Error("Company authentication required", { cause: 401 }));
+  }
+
+  const company = await companyModel
+    .findOne({
+      _id: companyId,
+      deletedAt: { $exists: false },
+    })
+    .select("logo")
+    .lean();
+
+  if (!company) {
+    return next(new Error("Company not found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      logo: company.logo?.secure_url || null,
+    },
+  });
+});
+
 // ========================== Search Company By Name ==========================
 export const getCompanyByName = asyncHandler(async (req, res, next) => {
   const { name } = req.query;
