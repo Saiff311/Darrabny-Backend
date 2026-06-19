@@ -18,6 +18,10 @@ userRouter.get("/getLoginUser",
     auth(Object.values(roles)),
     US.getLoginUser)
 
+userRouter.get("/profilePic",
+    auth(Object.values(roles)),
+    US.getProfilePic)
+
 userRouter.patch("/myNotifications",
     auth(Object.values(roles)),
     validation(UV.myNotificationsSchema),

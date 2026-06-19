@@ -21,6 +21,12 @@ StudentRouter.get(
   US.getLoginStudent,
 );
 
+StudentRouter.get(
+  "/profilePic",
+  auth([roles.student]),
+  US.getProfilePic,
+);
+
 StudentRouter.post(
   "/skills",
   validation(UV.addSkillSchema),

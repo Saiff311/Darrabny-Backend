@@ -67,6 +67,30 @@ export const getLoginUser = asyncHandler(async (req, res, next) => {
     }
   })
 })
+
+export const getProfilePic = asyncHandler(async (req, res, next) => {
+  const userId = req.user?._id;
+
+  if (!userId) {
+    return next(new Error("Authentication required", { cause: 401 }));
+  }
+
+  const user = await userModel
+    .findById(userId)
+    .select("profilePic")
+    .lean();
+
+  if (!user) {
+    return next(new Error("User not found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      profilePic: user.profilePic?.secure_url || null,
+    },
+  });
+});
 // --------------------------------------Etoo--------------------------------------------------------
 export const myNotifications = asyncHandler(async (req, res, next) => {
   const { email, push } = req.body

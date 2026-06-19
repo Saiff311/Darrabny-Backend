@@ -82,6 +82,31 @@ export const getLoginStudent = asyncHandler(async (req, res, next) => {
   });
 });
 
+// ========================== Get Student Profile Pic ==========================
+export const getProfilePic = asyncHandler(async (req, res, next) => {
+  const userId = req.user?._id;
+
+  if (!userId) {
+    return next(new Error("Authentication required", { cause: 401 }));
+  }
+
+  const user = await userModel
+    .findById(userId)
+    .select("profilePic")
+    .lean();
+
+  if (!user) {
+    return next(new Error("User not found", { cause: 404 }));
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      profilePic: user.profilePic?.secure_url || null,
+    },
+  });
+});
+
 // ========================== Student Profile ==========================
 export const getStudentProfile = asyncHandler(async (req, res, next) => {
   const { studentId } = req.params;
