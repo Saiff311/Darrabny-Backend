@@ -345,7 +345,12 @@ export const collegeSignin = asyncHandler(async (req, res, next) => {
 
 // ========================== Get All Universities ==========================
 export const getAllUniversities = asyncHandler(async (req, res, next) => {
+  const companyId = req.company?._id;
   const { name } = req.query;
+
+  if (!companyId) {
+    return next(new Error("Company authentication required", { cause: 401 }));
+  }
 
   const query = {
     deletedAt: { $exists: false },
@@ -362,10 +367,55 @@ export const getAllUniversities = asyncHandler(async (req, res, next) => {
     .sort({ collegeName: 1 })
     .lean();
 
+  const universityIds = universities.map((university) => university._id);
+  const partnershipStatusByUniversityId = new Map();
+
+  if (universityIds.length) {
+    const partnerships = await partnershipModel
+      .find({
+        companyId,
+        universityId: { $in: universityIds },
+      })
+      .select("universityId status createdAt updatedAt")
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+
+    for (const partnership of partnerships) {
+      const universityId = partnership.universityId?.toString();
+
+      if (!universityId || partnershipStatusByUniversityId.has(universityId)) {
+        continue;
+      }
+
+      let partnershipStatus = "pending";
+
+      if (partnership.status === "active") {
+        partnershipStatus = "accepted";
+      } else if (partnership.status === "rejected") {
+        partnershipStatus = "rejected";
+      } else if (partnership.status === "pending") {
+        partnershipStatus = "pending";
+      }
+
+      partnershipStatusByUniversityId.set(universityId, partnershipStatus);
+    }
+  }
+
+  const universitiesWithPartnershipState = universities.map((university) => {
+    const partnershipStatus =
+      partnershipStatusByUniversityId.get(university._id.toString()) || "none";
+
+    return {
+      ...university,
+      hasPartnership: partnershipStatus !== "none",
+      partnershipStatus,
+    };
+  });
+
   return res.status(200).json({
     success: true,
     message: "Universities fetched successfully",
-    data: universities,
+    data: universitiesWithPartnershipState,
   });
 });
 
