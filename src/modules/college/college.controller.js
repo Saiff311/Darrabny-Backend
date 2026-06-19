@@ -150,6 +150,27 @@ collegeRouter.get(
   CS.getCollegeInternsReports,
 );
 
+// ========================== Verification ==========================
+
+collegeRouter.get(
+  "/verification",
+  auth([roles.college]),
+  CS.collegeVerification,
+);
+
+collegeRouter.post(
+  "/verification/upload",
+  auth([roles.college]),
+  hostMulter([...fileTypes.image, ...fileTypes.pdf]).single("document"),
+  CS.uploadCollegeVerificationDocument,
+);
+
+collegeRouter.delete(
+  "/verification/document/:docId",
+  auth([roles.college]),
+  CS.deleteCollegeVerificationDocument,
+);
+
 // ========================== Get College Dashboard ==========================
 collegeRouter.get(
   "/dashboard",

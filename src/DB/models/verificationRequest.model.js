@@ -25,7 +25,12 @@ const verificationRequestSchema = new mongoose.Schema(
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "company",
-      required: true,
+      index: true,
+    },
+
+    collegeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "college",
       index: true,
     },
     status: {
@@ -53,7 +58,7 @@ verificationRequestSchema.virtual("documents", {
 });
 
 verificationRequestSchema.index({ companyId: 1, status: 1 });
-
+verificationRequestSchema.index({ collegeId: 1, status: 1 });
 const verificationRequestModel = mongoose.model(
   "verification_request",
   verificationRequestSchema,

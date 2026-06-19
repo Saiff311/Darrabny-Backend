@@ -6,6 +6,8 @@ import internshipReportModel from "../../DB/models/internshipReport.model.js";
 import studentModel from "../../DB/models/student.model.js";
 import companyModel from "../../DB/models/company.model.js";
 import partnershipModel from "../../DB/models/partnership.model.js";
+import verificationRequestModel from "../../DB/models/verificationRequest.model.js";
+import verificationDocumentModel from "../../DB/models/verificationDocument.model.js";
 import cloudinary from "../../utils/cloudinary.js";
 import { internshipStatus, appStatus, roles } from "../../utils/enums.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
@@ -1217,6 +1219,170 @@ export const updateNotificationPreferences = asyncHandler(
       success: true,
       message: "Notification preferences updated successfully",
       data: updatedCollege,
+    });
+  },
+);
+
+// ========================== Display College Verification ==========================
+export const collegeVerification = asyncHandler(async (req, res, next) => {
+  const collegeId = req.college._id;
+
+  const request = await verificationRequestModel
+    .findOne({ collegeId })
+    .sort({ createdAt: -1 })
+    .populate("documents")
+    .lean();
+
+  if (!request) {
+    return res.status(200).json({
+      msg: "Verification details retrieved",
+      data: {
+        status: "not_started",
+        validUntil: null,
+        history: [],
+        documents: [],
+      },
+    });
+  }
+
+  return res.status(200).json({
+    msg: "Verification details retrieved",
+    data: request,
+  });
+});
+
+// ========================= Upload College Verification Document =========================
+export const uploadCollegeVerificationDocument = asyncHandler(
+  async (req, res, next) => {
+    const collegeId = req.college._id;
+    const { documentName } = req.body;
+
+    if (!req.file) {
+      return next(
+        new Error("Document file is required", {
+          cause: 400,
+        }),
+      );
+    }
+
+    const { secure_url } = await cloudinary.uploader.upload(req.file.path, {
+      folder: "college-verification-documents",
+      resource_type: "auto",
+    });
+
+    let request = await verificationRequestModel
+      .findOne({ collegeId })
+      .sort({ createdAt: -1 });
+
+    if (!request) {
+      request = await verificationRequestModel.create({
+        collegeId,
+        status: "pending",
+        history: [
+          {
+            action: "document_uploaded",
+            date: new Date(),
+            note: `Uploaded ${documentName}`,
+          },
+        ],
+      });
+    } else {
+      request.status = "pending";
+
+      request.history.push({
+        action: "document_uploaded",
+        date: new Date(),
+        note: `Uploaded ${documentName}`,
+      });
+
+      await request.save();
+    }
+
+    const document = await verificationDocumentModel.create({
+      requestId: request._id,
+      documentName,
+      fileUrl: secure_url,
+      status: "pending",
+      uploadDate: new Date(),
+    });
+
+    await collegeModel.updateOne(
+      { _id: collegeId },
+      {
+        verificationStatus: "pending",
+        validUntil: null,
+      },
+    );
+
+    const populatedRequest = await verificationRequestModel
+      .findById(request._id)
+      .populate("documents")
+      .lean();
+
+    return res.status(201).json({
+      msg: "Verification document uploaded successfully",
+      document,
+      data: populatedRequest,
+    });
+  },
+);
+
+// ========================= Delete College Verification Document =========================
+export const deleteCollegeVerificationDocument = asyncHandler(
+  async (req, res, next) => {
+    const collegeId = req.college._id;
+    const { docId } = req.params;
+
+    const document = await verificationDocumentModel.findById(docId);
+
+    if (!document) {
+      return next(
+        new Error("Verification document not found", {
+          cause: 404,
+        }),
+      );
+    }
+
+    if (document.status === "approved") {
+      return next(
+        new Error("Approved documents cannot be deleted", {
+          cause: 400,
+        }),
+      );
+    }
+
+    const request = await verificationRequestModel.findById(
+      document.requestId,
+    );
+
+    if (!request) {
+      return next(
+        new Error("Verification request not found", {
+          cause: 404,
+        }),
+      );
+    }
+
+    if (String(request.collegeId) !== String(collegeId)) {
+      return next(
+        new Error("Not authorized to delete this document", {
+          cause: 403,
+        }),
+      );
+    }
+
+    await document.deleteOne();
+
+    request.history.push({
+      action: "document_deleted",
+      date: new Date(),
+      note: `Deleted ${document.documentName}`,
+    });
+
+    await request.save();
+
+    return res.status(200).json({
+      msg: "Verification document deleted successfully",
     });
   },
 );
