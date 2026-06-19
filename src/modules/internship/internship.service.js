@@ -291,27 +291,64 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
 
   const internshipIds = internships.map((internship) => internship._id);
 
-  const partnerUniversityAggregation = await internshipApprovalModel.aggregate([
+  const approvalAggregation = await internshipApprovalModel.aggregate([
     {
       $match: {
         internshipId: { $in: internshipIds },
-        status: "approved",
       },
     },
     {
       $group: {
         _id: "$internshipId",
-        partnerUniversityIds: { $addToSet: "$universityId" },
+        approvals: {
+          $push: {
+            universityId: { $toString: "$universityId" },
+            status: "$status",
+          },
+        },
       },
     },
   ]);
 
-  const partnerUniversityIdsMap = new Map(
-    partnerUniversityAggregation.map((item) => [
+  const approvalsByInternshipId = new Map(
+    approvalAggregation.map((item) => [
       item._id.toString(),
-      item.partnerUniversityIds.map((universityId) => universityId.toString()),
+      item.approvals || [],
     ]),
   );
+
+  const partnerUniversityIdsMap = new Map();
+  const universityStatusesMap = new Map();
+  const sentUniversityIdsMap = new Map();
+
+  for (const [internshipId, approvals] of approvalsByInternshipId.entries()) {
+    const partnerUniversityIds = [];
+    const universityStatuses = {};
+    const sentUniversityIds = [];
+
+    for (const approval of approvals) {
+      const universityId = approval?.universityId?.toString?.() || approval?.universityId;
+      if (!universityId) {
+        continue;
+      }
+
+      universityStatuses[universityId] = approval.status;
+
+      if (["pending", "approved"].includes(approval.status)) {
+        sentUniversityIds.push(universityId);
+      }
+
+      if (approval.status === "approved") {
+        partnerUniversityIds.push(universityId);
+      }
+    }
+
+    partnerUniversityIdsMap.set(internshipId, [
+      ...new Set(partnerUniversityIds),
+    ]);
+    universityStatusesMap.set(internshipId, universityStatuses);
+    sentUniversityIdsMap.set(internshipId, [...new Set(sentUniversityIds)]);
+  }
 
   // === الجديد هنا: حساب عدد الطلبة والتقارير لكل تدريب بالتوازي ===
   const internshipsWithStats = await Promise.all(
@@ -347,6 +384,10 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
         pendingReportsCount,
         partnerUniversityIds:
           partnerUniversityIdsMap.get(internship._id.toString()) || [],
+        sentUniversityIds:
+          sentUniversityIdsMap.get(internship._id.toString()) || [],
+        universityStatuses:
+          universityStatusesMap.get(internship._id.toString()) || {},
       };
     }),
   );
