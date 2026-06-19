@@ -7,6 +7,7 @@ import studentModel from "../../DB/models/student.model.js";
 import companySupervisorModel from "../../DB/models/company_supervisor.model.js";
 import { placementModel } from "../../DB/models/placment.model.js";
 import internshipReportModel from "../../DB/models/internshipReport.model.js";
+import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import { asyncHandler } from "../../utils/globalErrorHandling.js";
 import { emailEvent } from "../../services/sendEmail/email.event.js";
 import { escapeRegex } from "../../utils/security/escapeRegax.js";
@@ -288,6 +289,30 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
     return next(new Error("No internships found", { cause: 404 }));
   }
 
+  const internshipIds = internships.map((internship) => internship._id);
+
+  const partnerUniversityAggregation = await internshipApprovalModel.aggregate([
+    {
+      $match: {
+        internshipId: { $in: internshipIds },
+        status: "approved",
+      },
+    },
+    {
+      $group: {
+        _id: "$internshipId",
+        partnerUniversityIds: { $addToSet: "$universityId" },
+      },
+    },
+  ]);
+
+  const partnerUniversityIdsMap = new Map(
+    partnerUniversityAggregation.map((item) => [
+      item._id.toString(),
+      item.partnerUniversityIds.map((universityId) => universityId.toString()),
+    ]),
+  );
+
   // === الجديد هنا: حساب عدد الطلبة والتقارير لكل تدريب بالتوازي ===
   const internshipsWithStats = await Promise.all(
     internships.map(async (internship) => {
@@ -320,6 +345,8 @@ export const getCompanyInternships = asyncHandler(async (req, res, next) => {
         ...internship,
         studentsCount,
         pendingReportsCount,
+        partnerUniversityIds:
+          partnerUniversityIdsMap.get(internship._id.toString()) || [],
       };
     }),
   );
