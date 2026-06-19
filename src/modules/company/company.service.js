@@ -5,7 +5,6 @@ import collegeModel from "../../DB/models/college.model.js";
 import internshipApprovalModel from "../../DB/models/internshipApproval.model.js";
 import { placementModel } from "../../DB/models/placment.model.js";
 import companyReviewModel from "../../DB/models/companyReview.model.js";
-import { placementModel } from "../../DB/models/placment.model.js";
 import userModel from "../../DB/models/user.model.js";
 import verificationRequestModel from "../../DB/models/verificationRequest.model.js";
 import verificationDocumentModel from "../../DB/models/verificationDocument.model.js";

@@ -69,6 +69,16 @@ const collegeSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    verificationStatus: {
+      type: String,
+      enum: ["pending", "verified", "rejected"],
+      default: "pending",
+    },
+
+    validUntil: {
+      type: Date,
+      default: null,
+    },
     bannedAt: Date,
     deletedAt: Date,
   },

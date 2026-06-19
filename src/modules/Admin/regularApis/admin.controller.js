@@ -46,4 +46,28 @@ adminRouter.patch(
     AS.updateVerificationStatus)
 
 
+// ========================== Get Pending College Verification Requests ==========================
+adminRouter.get(
+  "/college-verifications/pending",
+  validation(AV.emptySchema),
+  auth([roles.admin]),
+  AS.getPendingCollegeVerifications,
+);
+
+// ========================== Review College Verification Document ==========================
+adminRouter.patch(
+  "/college-verifications/documents/:docId",
+  validation(AV.updateDocumentStatusSchema),
+  auth([roles.admin]),
+  AS.updateCollegeDocumentStatus,
+);
+
+// ========================== Update College Verification Request Status ==========================
+adminRouter.patch(
+  "/college-verifications/:requestId/status",
+  validation(AV.updateVerificationStatusSchema),
+  auth([roles.admin]),
+  AS.updateCollegeVerificationStatus,
+);
+
 export default adminRouter

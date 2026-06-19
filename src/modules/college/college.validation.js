@@ -141,4 +141,10 @@ export const updateNotificationPreferencesSchema = joi
     })
     .or("email", "push")
 
+export const uploadVerificationDocumentSchema = joi.object({
+  documentName: joi.string().required(),
+});
 
+export const deleteVerificationDocumentSchema = joi.object({
+  docId: generalRules.id.required(),
+});
