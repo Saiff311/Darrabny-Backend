@@ -64,6 +64,13 @@ collegeRouter.get(
   CS.getCollegeByName,
 );
 
+collegeRouter.get(
+  "/logo",
+  auth([roles.college]),
+  validation(CV.emptySchema),
+  CS.getUniversityLogo,
+);
+
 // ------------------ College Settings ------------------
 collegeRouter.get(
   "/settings",
