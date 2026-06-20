@@ -398,6 +398,7 @@ export const getAllUniversities = asyncHandler(async (req, res, next) => {
   });
 });
 
+
 //get pending endorsement requests for the authenticated university
 export const getPendingEndorsements = asyncHandler(async (req, res, next) => {
   const universityId = req.college?._id;
@@ -532,7 +533,7 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
   log("=== INTERNSHIP IDS ===", internshipIds);
 
   // =========================
-  // 2. GET APPLICATIONS
+  // 2. GET APPLICATIONS & STUDENTS FROM THIS COLLEGE
   // =========================
   const applications = await applicationModel
     .find({
@@ -560,10 +561,16 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     )
     .filter(Boolean);
 
+  // التعديل الأول: فلترة الطلبة بناءً على الـ universityId
   const students = await studentModel
-    .find({ userId: { $in: userIds } })
-    .select("userId")
+    .find({ 
+      userId: { $in: userIds },
+      collegeId: universityId // تأكد إن الحقل ده اسمه universityId في الـ Schema عندك
+    })
+    .select("userId _id")
     .lean();
+
+  const validStudentIds = students.map((student) => student._id);
 
   const userToStudentMap = new Map(
     students.map((student) => [
@@ -572,14 +579,16 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     ]),
   );
 
-  log("=== ACCEPTED APPLICATIONS ===", acceptedApplications.length);
+  log("=== ACCEPTED APPLICATIONS FROM THIS COLLEGE ===", students.length);
 
   // =========================
-  // 3. GET REPORTS (IMPORTANT FIX)
+  // 3. GET REPORTS (FILTERED BY STUDENTS)
   // =========================
+  // التعديل التاني: جلب التقارير الخاصة بطلبة هذه الكلية فقط
   const reports = await internshipReportModel
     .find({
       internshipId: { $in: internshipIds },
+      studentId: { $in: validStudentIds } 
     })
     .select(
       "internshipId studentId title periodStart periodEnd status keyAchievements challengesFaced learningOutcomes technicalSkillScore problemSolvingScore communicationScore initiativeScore internalNote approvedAt createdAt updatedAt"
@@ -590,84 +599,22 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
     })
     .lean();
 
-  log("=== TOTAL REPORTS ===", reports.length);
-  console.log(reports);
+  log("=== TOTAL REPORTS FOR THIS COLLEGE ===", reports.length);
 
   // =========================
   // 4. INDEX REPORTS BY INTERNSHIP
   // =========================
   const reportsByInternship = new Map();
 
-  console.log("\n==============================");
-  console.log("=== START GROUPING REPORTS ===");
-  console.log("==============================\n");
-
-  for (const [index, report] of reports.entries()) {
-    console.log("\n--------------------------------");
-    console.log(`REPORT #${index + 1}`);
-    console.log("--------------------------------");
-
-    console.log("RAW REPORT:");
-    console.log(report);
-
+  for (const report of reports) {
     const internshipIdStr = report.internshipId?.toString();
 
-    console.log("EXTRACTED internshipId:");
-    console.log({
-      raw: report.internshipId,
-      normalized: internshipIdStr,
-    });
+    if (!internshipIdStr) continue;
 
-    if (!internshipIdStr) {
-      console.log("❌ SKIPPED REPORT - NO internshipId");
-      continue;
-    }
-
-    const existsBefore = reportsByInternship.has(internshipIdStr);
-
-    console.log("MAP STATE BEFORE INSERT:");
-    console.log({
-      internshipId: internshipIdStr,
-      alreadyExists: existsBefore,
-      currentMapSize: reportsByInternship.size,
-    });
-
-    if (!existsBefore) {
-      console.log("🆕 Creating new array for this internship");
+    if (!reportsByInternship.has(internshipIdStr)) {
       reportsByInternship.set(internshipIdStr, []);
     }
-
     reportsByInternship.get(internshipIdStr).push(report);
-
-    console.log("✅ REPORT ADDED");
-
-    console.log("MAP STATE AFTER INSERT:");
-    console.log(
-      Array.from(reportsByInternship.entries()).map(([key, value]) => ({
-        internshipId: key,
-        reportsCount: value.length,
-      }))
-    );
-  }
-
-  console.log("\n==============================");
-  console.log("=== FINAL GROUPED RESULT ===");
-  console.log("==============================");
-
-  for (const [key, value] of reportsByInternship.entries()) {
-    console.log("\nINTERN-SHIP GROUP:");
-    console.log("internshipId:", key);
-    console.log("reportsCount:", value.length);
-
-    console.log("reports preview:");
-    console.log(
-      value.map((r) => ({
-        id: r._id,
-        internshipId: r.internshipId,
-        studentId: r.studentId,
-        title: r.title,
-      }))
-    );
   }
 
   // =========================
@@ -704,43 +651,49 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
         if (!reportsByStudent.has(studentIdStr)) {
           reportsByStudent.set(studentIdStr, []);
         }
-
         reportsByStudent.get(studentIdStr).push(report);
       }
 
       // interns mapping
-      const interns = internshipApplications.map((application) => {
-        const userIdStr =
-          application.userId?._id?.toString() ||
-          application.userId?.toString();
-        const studentIdStr = userToStudentMap.get(userIdStr) || null;
+      const interns = internshipApplications
+        .map((application) => {
+          const userIdStr =
+            application.userId?._id?.toString() ||
+            application.userId?.toString();
+            
+          const studentIdStr = userToStudentMap.get(userIdStr) || null;
 
-        const reports = studentIdStr
-          ? reportsByStudent.get(studentIdStr) || []
-          : [];
+          // التعديل التالت: لو الطالب مش في الكلية دي (studentIdStr = null)، تجاهله
+          if (!studentIdStr) return null;
 
-        const studentReport = reports[0] || null;
+          const studentReports = reportsByStudent.get(studentIdStr) || [];
+          const studentReport = studentReports[0] || null;
 
-        return {
-          applicationId: application._id,
+          return {
+            applicationId: application._id,
 
-          student: application.userId
-            ? {
-              id: studentIdStr,
-              fullName: `${application.userId.firstName} ${application.userId.lastName}`,
-              firstName: application.userId.firstName,
-              lastName: application.userId.lastName,
-              email: application.userId.email,
-              profilePic: application.userId.profilePic,
-              skills: application.userId.skills || [],
-            }
-            : null,
+            student: application.userId
+              ? {
+                  id: studentIdStr,
+                  fullName: `${application.userId.firstName} ${application.userId.lastName}`,
+                  firstName: application.userId.firstName,
+                  lastName: application.userId.lastName,
+                  email: application.userId.email,
+                  profilePic: application.userId.profilePic,
+                  skills: application.userId.skills || [],
+                }
+              : null,
 
-          reports,
+            reports: studentReports,
 
-          reportId: studentReport ? studentReport._id : null,
-        };
-      });
+            reportId: studentReport ? studentReport._id : null,
+          };
+        })
+        .filter(Boolean); // ده هيشيل أي null رجع من الـ map للطلبة اللي برة الكلية
+
+      // لو التدريب ده مفيش فيه طلبة من الكلية دي بعد الفلترة، ممكن متحبش ترجعه في الداتا
+      // لو عايز ترجعه حتى لو مفيش طلبة، شيل السطر اللي جاي
+      if (interns.length === 0) return null;
 
       return {
         internship: {
@@ -757,7 +710,6 @@ export const getCollegeInternsReports = asyncHandler(async (req, res, next) => {
           thumbnail: internship.thumbnail,
           status: internship.status,
         },
-
         interns,
       };
     })

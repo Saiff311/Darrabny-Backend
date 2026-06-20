@@ -70,3 +70,7 @@ export const updatePasswordSchema = joi.object({
     newPassword : generalRules.password.required(),
     confirmPassword :generalRules.password.required().valid(joi.ref("newPassword")),
 })
+
+export const updateStudentCollegeSchema = joi.object({
+    collegeId: generalRules.id.required(),
+})

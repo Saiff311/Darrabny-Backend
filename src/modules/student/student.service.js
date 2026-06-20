@@ -6,6 +6,7 @@ import { decrypt } from "../../utils/security/encryption.js";
 import studentModel from "../../DB/models/student.model.js";
 import internshipReportModel from "../../DB/models/internshipReport.model.js";
 import applicationModel from "../../DB/models/application.model.js";
+import collegeModel from "../../DB/models/college.model.js";
 
 const formatDuration = (startDate, endDate, durationInMonths) => {
   if (typeof durationInMonths === "number" && durationInMonths > 0) {
@@ -70,7 +71,11 @@ export const getLoginStudent = asyncHandler(async (req, res, next) => {
 
   const student = await studentModel
     .findOne({ userId: req.user._id })
-    .select("badges")
+    .select("badges collegeId")
+    .populate({
+      path: "collegeId",
+      select: "collegeName logo address role",
+    })
     .lean();
 
   user.mobileNumber = await decrypt(user.mobileNumber);
@@ -79,6 +84,7 @@ export const getLoginStudent = asyncHandler(async (req, res, next) => {
     msg: "My Profile",
     user,
     badges: student?.badges || [],
+    college: student?.collegeId || null,
   });
 });
 
@@ -434,6 +440,43 @@ export const deleteProject = asyncHandler(async (req, res, next) => {
   await student.save();
 
   return res.status(200).json({ message: "Project deleted successfully" });
+});
+
+// ========================== Student College ==========================
+export const updateStudentCollege = asyncHandler(async (req, res, next) => {
+  const { collegeId } = req.body;
+
+  const student = await studentModel.findOne({ userId: req.user._id });
+
+  if (!student) {
+    return next(new Error("Student not found", { cause: 404 }));
+  }
+
+  const college = await collegeModel.findOne({
+    _id: collegeId,
+    deletedAt: { $exists: false },
+    bannedAt: { $exists: false },
+  });
+
+  if (!college) {
+    return next(new Error("College not found", { cause: 404 }));
+  }
+
+  student.collegeId = college._id;
+  await student.save();
+
+  const updatedStudent = await studentModel
+    .findById(student._id)
+    .populate({
+      path: "collegeId",
+      select: "collegeName logo address role",
+    })
+    .lean();
+
+  return res.status(200).json({
+    msg: "Student college updated successfully",
+    student: updatedStudent,
+  });
 });
 
 // ========================== Resume ==========================

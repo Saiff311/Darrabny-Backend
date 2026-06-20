@@ -15,6 +15,13 @@ StudentRouter.patch(
   US.UpdateStudentAccount,
 );
 
+StudentRouter.patch(
+  "/college",
+  validation(UV.updateStudentCollegeSchema),
+  auth([roles.student]), 
+  US.updateStudentCollege,
+);
+
 StudentRouter.get(
   "/getLoginStudent",
   auth([roles.student]),

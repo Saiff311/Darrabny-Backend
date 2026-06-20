@@ -101,7 +101,6 @@ export const getAllUniversitiesSchema = joi.object({
   name: joi.string().trim().optional(),
 });
 
-
 export const collegeSigninSchema = joi.object({
     email: generalRules.email.required(),
     password: joi.string().required(),

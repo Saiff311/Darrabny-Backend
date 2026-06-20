@@ -45,10 +45,11 @@ collegeRouter.delete(
 // ------------------ Get All Universities ------------------
 collegeRouter.get(
   "/universities",
-  auth([roles.company]),
   validation(CV.getAllUniversitiesSchema),
   CS.getAllUniversities,
 );
+
+
 
 collegeRouter.get(
   "/getCollege/:collegeId",
