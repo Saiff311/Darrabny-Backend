@@ -23,6 +23,14 @@ const certificateMimeTypes = [
 const uploadAttachmentMulter = hostMulter(allowedMimeTypes, 10);
 const uploadCertificateMulter = hostMulter(certificateMimeTypes, 10);
 
+// -----------------Upload Certificate------------------
+internshipReportRouter.post(
+  "/upload-certificate",
+  auth([roles.company]),
+  uploadCertificateMulter.single("file"),
+  JS.uploadCertificate
+);
+
 // -----------------Create intern evaluation------------------
 internshipReportRouter.post(
   "/evaluation",
@@ -30,6 +38,7 @@ internshipReportRouter.post(
   validation(JV.createInternEvaluationSchema),
   JS.createInternEvaluation
 );
+
 
 // -----------------add report comment------------------
 internshipReportRouter.post(
@@ -56,13 +65,7 @@ internshipReportRouter.delete(
   JS.deleteReportAttachment
 );
 
-// -----------------Upload Certificate------------------
-internshipReportRouter.post(
-  "/upload-certificate",
-  auth([roles.company]),
-  uploadCertificateMulter.single("file"),
-  JS.uploadCertificate
-);
+
 
 internshipReportRouter.get("/internship/:id/report-prefill",
   auth([roles.student, roles.company]),  // student, company
@@ -95,7 +98,7 @@ internshipReportRouter.patch("/:id/status",
 );
 
 internshipReportRouter.get("/:id/pdf",
-  auth([roles.company, roles.student, roles.admin]),   //  company, student, admin
+  auth([roles.company, roles.student, roles.admin, roles.college]),   //  company, student, admin, college
   validation(JV.downloadReportPDFSchema),
   JS.downloadReportPDF
 );
