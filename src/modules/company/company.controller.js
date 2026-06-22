@@ -58,7 +58,7 @@ companyRouter.get(
 
 // ------------------ Upload Company Logo ------------------
 companyRouter.patch(
-  "/uploadCompanyLogo/:companyId",
+  "/uploadCompanyLogo",
   hostMulter(fileTypes.image).single("attachment"),
   // validation(CV.uploadCompanyLogoSchema), // optional
   auth(Object.values(roles)),
