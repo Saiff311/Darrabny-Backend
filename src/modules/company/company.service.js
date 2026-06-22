@@ -213,31 +213,56 @@ export const getCompanyByName = asyncHandler(async (req, res, next) => {
 
 // ========================== Upload Company Logo ==========================
 export const uploadCompanyLogo = asyncHandler(async (req, res, next) => {
-  const { companyId } = req.params;
+  const companyId = req.company?._id;
 
-  // Find owned company
+  if (!companyId) {
+    return next(new Error("Company authentication required", { cause: 401 }));
+  }
+
   const company = await companyModel.findOne({
     _id: companyId,
-    createdBy: req.user._id,
     deletedAt: { $exists: false },
   });
-  if (!company) return next(new Error("Company not found!", { cause: 404 }));
-  if (company.bannedAt)
+
+  if (!company) {
+    return next(new Error("Company not found!", { cause: 404 }));
+  }
+
+  if (company.bannedAt) {
     return next(new Error("Company is banned!", { cause: 403 }));
+  }
+
+  if (!req.file) {
+    return next(new Error("Logo file is required", { cause: 400 }));
+  }
 
   // Delete old logo
-  if (company.logo.public_id)
+  if (company.logo?.public_id) {
     await cloudinary.uploader.destroy(company.logo.public_id);
+  }
 
   // Upload new logo
   const { secure_url, public_id } = await cloudinary.uploader.upload(
     req.file.path,
-    { folder: "logo pics" },
+    {
+      folder: "logo pics",
+    }
   );
-  const logo = { secure_url, public_id };
 
-  await companyModel.updateOne({ _id: companyId }, { logo });
-  return res.status(200).json({ msg: "Logo uploaded successfully" });
+  const logo = {
+    secure_url,
+    public_id,
+  };
+
+  await companyModel.updateOne(
+    { _id: companyId },
+    { logo }
+  );
+
+  return res.status(200).json({
+    msg: "Logo uploaded successfully",
+    logo,
+  });
 });
 
 // ========================== Upload Company Cover ==========================
