@@ -1548,6 +1548,7 @@ export const getMyCompanyProfile = asyncHandler(
         startDate
         endDate
         technicalSkills
+        thumbnail
       `)
       .sort({ createdAt: -1 });
 
