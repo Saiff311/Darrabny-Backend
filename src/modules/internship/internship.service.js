@@ -1018,68 +1018,182 @@ export const responseApp = asyncHandler(async (req, res, next) => {
 
 // ========================== Get Student Internships ==========================
 export const getStudentInternships = asyncHandler(async (req, res, next) => {
-  const studentId = req.user._id;
   const { status, page = 1, limit = 10 } = req.query;
-  const skip = (page - 1) * limit;
+
+  const skip = (Number(page) - 1) * Number(limit);
   const today = new Date();
 
+  // =========================
+  // Get Student Profile
+  // =========================
+  const studentProfile = await studentModel.findOne({
+    userId: req.user._id,
+  });
+
+  if (!studentProfile) {
+    return next(new Error("Student profile not found", { cause: 404 }));
+  }
+
+  // =========================
+  // Status Filter
+  // =========================
   let statusFilter = {};
+
   if (status === internshipStatus.inProgress) {
     statusFilter.endDate = { $gte: today };
   } else if (status === internshipStatus.completed) {
     statusFilter.endDate = { $lt: today };
   }
 
+  // =========================
+  // Student Applications
+  // =========================
   const applications = await applicationModel
-    .find({ userId: studentId })
+    .find({ userId: req.user._id })
     .select("internshipId")
     .lean();
 
-  const internshipIds = applications.map((app) => app.internshipId);
+  const internshipIds = applications.map(
+    (app) => app.internshipId
+  );
 
+  // =========================
+  // Total Count
+  // =========================
   const totalCount = await internshipModel.countDocuments({
     _id: { $in: internshipIds },
     ...statusFilter,
   });
 
+  // =========================
+  // Get Internships
+  // =========================
   const internships = await internshipModel
-    .find({ _id: { $in: internshipIds }, ...statusFilter })
+    .find({
+      _id: { $in: internshipIds },
+      ...statusFilter,
+    })
     .sort({ createdAt: -1 })
-    .skip(Number(skip))
+    .skip(skip)
     .limit(Number(limit))
     .populate("companyId", "companyName")
     .lean();
 
+  // =========================
+  // Get Reports
+  // =========================
+  const reports = await internshipReportModel
+    .find({
+      studentId: studentProfile._id,
+    })
+    .select(
+      "_id internshipId title status createdAt overallRating"
+    )
+    .lean();
+
+  const reportsMap = new Map();
+
+  reports.forEach((report) => {
+    reportsMap.set(
+      report.internshipId.toString(),
+      report
+    );
+  });
+
+  // =========================
+  // Build Response
+  // =========================
   const msPerDay = 24 * 60 * 60 * 1000;
 
   const data = internships.map((internship) => {
     const start = new Date(internship.startDate);
     const end = new Date(internship.endDate);
-    const totalWeeks = Math.ceil((end - start) / msPerDay / 7);
-    const currentWeek = Math.min(
-      Math.ceil((today - start) / msPerDay / 7),
-      totalWeeks,
+
+    const totalWeeks = Math.ceil(
+      (end - start) / msPerDay / 7
     );
-    const progress = Math.round((currentWeek / totalWeeks) * 100);
+
+    const currentWeek = Math.max(
+      0,
+      Math.min(
+        Math.ceil((today - start) / msPerDay / 7),
+        totalWeeks
+      )
+    );
+
+    const progress =
+      totalWeeks > 0
+        ? Math.round((currentWeek / totalWeeks) * 100)
+        : 0;
+
+    // =========================
+    // Report
+    // =========================
+    const report = reportsMap.get(
+      internship._id.toString()
+    );
+
+    // =========================
+    // Certificate
+    // =========================
+    const certificate =
+      studentProfile.certificates?.find(
+        (cert) =>
+          cert.internshipId?.toString() ===
+          internship._id.toString()
+      );
 
     return {
       id: internship._id,
+
       title: internship.internshipTitle,
+
       company: {
-        id: internship.companyId._id,
-        name: internship.companyId.companyName,
+        id: internship.companyId?._id,
+        name: internship.companyId?.companyName,
       },
+
       location: internship.internshipLocation,
+
       thumbnail: internship.thumbnail || "",
+
       startDate: internship.startDate,
+
+      endDate: internship.endDate,
+
       currentWeek,
+
       totalWeeks,
+
       progress,
-      status: internship.endDate >= today ? "inProgress" : "completed",
+
+      status: report
+        ? "completed"
+        : internship.endDate >= today
+        ? "inProgress"
+        : "completed",
+
+      report: report
+        ? {
+            id: report._id,
+            title: report.title,
+            status: report.status,
+            overallRating: report.overallRating,
+            createdAt: report.createdAt,
+          }
+        : null,
+
+      certificate: certificate
+        ? {
+            url: certificate.url,
+            issuedAt: certificate.date,
+          }
+        : null,
     };
   });
 
   return res.status(200).json({
+    success: true,
     data,
     meta: {
       page: Number(page),

@@ -240,24 +240,39 @@ export const deleteReportAttachment = asyncHandler(async (req, res) => {
 
 export const uploadCertificate = asyncHandler(async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ message: "No file provided" });
+    return res.status(400).json({
+      success: false,
+      message: "No file provided",
+    });
   }
 
   try {
-    const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-      folder: "InternshipAPP/certificates",
-      resource_type: "auto",
-      public_id: `certificate_${Date.now()}`,
-    });
+    console.log("FILE RECEIVED:", req.file);
+
+    const cloudinaryResult = await cloudinary.uploader.upload(
+      req.file.path,
+      {
+        folder: "InternshipAPP/certificates",
+        resource_type: "auto",
+        public_id: `certificate_${Date.now()}`,
+      }
+    );
 
     return res.status(201).json({
       success: true,
       certificateUrl: cloudinaryResult.secure_url,
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error uploading certificate", error: error.message });
+    console.error("❌ CLOUDINARY ERROR:");
+    console.error("Message:", error.message);
+    console.error("Full Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error uploading certificate",
+      error: error.message,
+      hint: "Check multer file path, cloudinary config, or file type",
+    });
   }
 });
 
