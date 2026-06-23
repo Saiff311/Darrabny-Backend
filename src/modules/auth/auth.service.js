@@ -286,9 +286,10 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
   }
   // Get the latest valid and non-expired OTP for forgetPassword type
   const now = new Date();
-  const validOtp = user.otp.find(
-    (otp) => otp.type === otpType.forgetPassword && otp.expiresIn > now,
-  );
+  // بنعمل نسخة من الـ Array ونعكسها عشان نجيب أحدث كود
+const validOtp = [...user.otp].reverse().find(
+  (otp) => otp.type === otpType.forgetPassword && otp.expiresIn > now,
+);
   if (!validOtp) {
     return next(new Error("Expired or invalid OTP", { cause: 400 }));
   }

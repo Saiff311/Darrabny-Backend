@@ -60,5 +60,4 @@ export const resetPasswordSchema = joi.object({
     email : generalRules.email.required(),
     code : joi.string().required().length(4),
     newPassword : generalRules.password.required(),
-    confirmPassword :generalRules.password.required().valid(joi.ref("newPassword")),
 }).required()

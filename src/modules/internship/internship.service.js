@@ -100,11 +100,11 @@ export const addInternship = asyncHandler(async (req, res, next) => {
     return next(new Error("Company authentication required", { cause: 401 }));
   }
 
-  if (!company.approvedByAdmin) {
-    return next(
-      new Error("Company is not approved by admin yet", { cause: 403 }),
-    );
-  }
+  // if (!company.approvedByAdmin) {
+  //   return next(
+  //     new Error("Company is not approved by admin yet", { cause: 403 }),
+  //   );
+  // }
 
   if (company.deletedAt || company.bannedAt) {
     return next(new Error("Company is deleted or banned", { cause: 403 }));
