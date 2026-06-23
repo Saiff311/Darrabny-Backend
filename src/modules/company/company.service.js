@@ -987,8 +987,8 @@ export const getCompanyDashboard = asyncHandler(async (req, res, next) => {
         ? 100
         : 0
       : ((currentMonthApplicants - previousMonthApplicants) /
-          previousMonthApplicants) *
-        100;
+        previousMonthApplicants) *
+      100;
 
   const acceptanceStats = acceptanceAgg?.[0] || { total: 0, accepted: 0 };
   const acceptanceRate =
@@ -1465,7 +1465,6 @@ export const getCompanyReviews = asyncHandler(
   async (req, res, next) => {
     const { companyId } = req.params;
 
-    // check company exists
     const company = await companyModel.findOne({
       _id: companyId,
       deletedAt: { $exists: false },
@@ -1477,7 +1476,7 @@ export const getCompanyReviews = asyncHandler(
 
     const reviews = await companyReviewModel
       .find({ companyId })
-      .populate("userId", "fullName profilePic")
+      .populate("userId", "firstName lastName profilePic")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -1490,7 +1489,12 @@ export const getCompanyReviews = asyncHandler(
       reviews: reviews.map((review) => ({
         id: review._id,
 
-        user: review.userId,
+        user: {
+          id: review.userId?._id,
+          fullName:
+            `${review.userId?.firstName || ""} ${review.userId?.lastName || ""}`.trim(),
+          profilePic: review.userId?.profilePic,
+        },
 
         rating: review.rating,
 
@@ -1499,7 +1503,7 @@ export const getCompanyReviews = asyncHandler(
         date: review.createdAt,
       })),
     });
-  }
+  },
 );
 
 // ========================= Get My Company Profile =========================
@@ -1564,7 +1568,7 @@ export const getMyCompanyProfile = asyncHandler(
       .find({
         companyId,
       })
-      .populate("userId", "fullName profilePic")
+      .populate("userId", "firstName lastName profilePic")
       .sort({ createdAt: -1 });
 
     // ========================= Stats =========================
@@ -1592,7 +1596,8 @@ export const getMyCompanyProfile = asyncHandler(
 
         user: {
           id: review.userId?._id,
-          fullName: review.userId?.fullName,
+          fullName:
+            `${review.userId?.firstName || ""} ${review.userId?.lastName || ""}`.trim(),
           profilePic: review.userId?.profilePic,
         },
 
@@ -1738,11 +1743,11 @@ export const getCompletedInternshipsOverview = asyncHandler(
     const successRate =
       totalGraduates > 0
         ? Number(
-            (
-              (successfulPlacements / totalGraduates) *
-              100
-            ).toFixed(1)
-          )
+          (
+            (successfulPlacements / totalGraduates) *
+            100
+          ).toFixed(1)
+        )
         : 0;
 
     // ========================= Top Department =========================
@@ -1787,8 +1792,8 @@ export const getCompletedInternshipsOverview = asyncHandler(
       percentage:
         totalGraduates > 0
           ? Number(
-              ((count / totalGraduates) * 100).toFixed(1)
-            )
+            ((count / totalGraduates) * 100).toFixed(1)
+          )
           : 0,
     }));
 
@@ -1801,9 +1806,8 @@ export const getCompletedInternshipsOverview = asyncHandler(
         student: {
           id: placement.studentId?._id,
 
-          fullName: `${placement.studentId?.firstName || ""} ${
-            placement.studentId?.lastName || ""
-          }`.trim(),
+          fullName: `${placement.studentId?.firstName || ""} ${placement.studentId?.lastName || ""
+            }`.trim(),
 
           profilePic:
             placement.studentId?.profilePic || null,
