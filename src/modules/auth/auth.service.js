@@ -162,7 +162,7 @@ export const login = asyncHandler(async (req, res, next) => {
       : process.env.USER_SECRET_KEY;
 
   const accessToken = jwt.sign({ email, id: user._id }, secretKey, {
-    expiresIn: "1h",
+    expiresIn: "2h",
   });
 
   const refreshToken = jwt.sign({ email, id: user._id }, secretKey, {
